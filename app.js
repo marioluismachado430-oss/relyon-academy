@@ -259,12 +259,18 @@ function splitContentPages(content, maxLen){
   var html = looksHtml(raw) ? raw : h(raw).replace(/\n/g,'<br>');
   var blocks = html.split(/(?:<br\s*\/?>\s*){2,}/i).filter(function(b){ return b && b.trim(); });
   if (!blocks.length) blocks = [html];
+  function visualLen(s){
+    var imgCount = (s.match(/<img[^>]*>/g)||[]).length;
+    var textLen = s.replace(/<[^>]+>/g,'').length;
+    return textLen + imgCount*480;
+  }
   var pages = []; var cur = '';
   blocks.forEach(function(b){
-    var curLen = cur.replace(/<[^>]+>/g,'').length;
-    var bLen = b.replace(/<[^>]+>/g,'').length;
+    var curLen = visualLen(cur);
+    var bLen = visualLen(b);
     if (cur && (curLen + bLen) > maxLen){ pages.push(cur); cur = b; }
     else cur = cur ? (cur + '<br><br>' + b) : b;
+    if (visualLen(cur) > maxLen*1.4 && /<img[^>]*>/.test(cur)){ pages.push(cur); cur=''; }
   });
   if (cur) pages.push(cur);
   return pages.length ? pages : [html];
@@ -275,7 +281,7 @@ function buildFlipbookPages(titulo, subtitulo, content, trecho, equip, manuais, 
   pages.push('<div class="fp-page fp-cover"'+(coverImg?' style="background-image:linear-gradient(0deg,rgba(0,0,0,.55),rgba(0,0,0,.25)),url(\''+coverImg.url.replace(/'/g,"%27")+'\')"':'')+'><h2>'+h(subtitulo||'')+'</h2><h1>'+h(titulo||'')+'</h1></div>');
   var extraImages = (images||[]).slice(1);
   var imgIdx = 0;
-  splitContentPages(content||'', 950).forEach(function(chunk, i){
+  splitContentPages(content||'', 780).forEach(function(chunk, i){
     var imgHtml = '';
     if (imgIdx < extraImages.length && (i%2===1)){
       var im = extraImages[imgIdx++];
@@ -298,15 +304,15 @@ function downloadFlipbookHtml(titulo, pagesHtml){
     '<meta name="viewport" content="width=device-width, initial-scale=1">'+
     '<title>'+h(titulo||'Flipbook')+' — RelyOn Academy</title>'+
     '<style>html,body{margin:0;background:#0B0F17;color:#fff;font-family:system-ui,sans-serif}'+
-    '.fp-page{position:relative;background:#f6f1e3;color:#2b2016;padding:34px 30px;box-sizing:border-box;font-family:Georgia,\'Times New Roman\',serif;font-size:14px;line-height:1.75;overflow:hidden;border:1px solid #d8cdae;background-size:cover;background-position:center;box-shadow:inset 0 0 50px rgba(60,40,10,.08)}'+
+    '.fp-page{position:relative;background:#f6f1e3;color:#2b2016;padding:34px 30px;box-sizing:border-box;font-family:Georgia,\'Times New Roman\',serif;font-size:14px;line-height:1.75;overflow-y:auto;overflow-x:hidden;border:1px solid #d8cdae;background-size:cover;background-position:center;box-shadow:inset 0 0 50px rgba(60,40,10,.08);display:flex;flex-direction:column}'+
     '.fp-page::after{content:\'\';position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.10),transparent 6%,transparent 94%,rgba(0,0,0,.10))}'+
     '.fp-page h1{font-size:20px;margin:6px 0 2px;font-family:Georgia,serif}.fp-page h2{font-size:12px;color:#8a7a5c;text-transform:uppercase;letter-spacing:.05em;margin-bottom:0}'+
     '.fp-page h3{font-size:15px;color:#a3620f;margin-bottom:10px;font-family:Georgia,serif}.fp-page blockquote{font-style:italic;border-left:3px solid #a3620f;padding-left:12px;margin:0;font-size:13px;color:#4a3d28}'+
     '.fp-page ul{padding-left:20px;margin:0}.fp-page ul li{margin-bottom:6px;font-size:13px}'+
     '.fp-text{font-family:Georgia,\'Times New Roman\',serif;font-size:14px;line-height:1.9;text-align:justify}.fp-text img{max-width:100%;border-radius:4px;margin:10px 0;display:block;box-shadow:0 2px 10px rgba(0,0,0,.18)}'+
     '.fp-cover{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:linear-gradient(160deg,#2b2016,#1a140d);color:#f0e6d2}.fp-cover h1{color:#f0e6d2}.fp-cover h2{color:#c9a86a}'+
-    '.fp-img-wrap{margin:-34px -30px 14px;overflow:hidden}.fp-img-wrap img{width:100%;max-height:200px;object-fit:cover;display:block}'+
-    '.fp-page-full-img{padding:0}.fp-page-full-img img{width:100%;height:100%;object-fit:cover;display:block}'+
+    '.fp-img-wrap{margin:-34px -30px 14px;overflow:hidden;background:#2b2016}.fp-img-wrap img{width:100%;max-height:230px;object-fit:contain;display:block;background:#2b2016}'+
+    '.fp-page-full-img{padding:0;overflow:hidden}.fp-page-full-img img{width:100%;height:100%;object-fit:contain;display:block;background:#2b2016}'+
     'body{display:flex;justify-content:center;padding:20px;background:#0B0F17}#fp-book{width:100%;max-width:800px;filter:drop-shadow(0 18px 40px rgba(0,0,0,.5))}</style>'+
     '<script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"><\/script>'+
     '</head><body><div id="fp-book">'+pagesHtml.join('')+'</div>'+
