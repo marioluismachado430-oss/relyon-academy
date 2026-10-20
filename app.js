@@ -91,17 +91,73 @@ function toggleEdit(){ STATE.edit = !STATE.edit; render(); toast(STATE.edit ? 'M
 function editableText(path, value){
   var v = ed(path, value);
   if (!STATE.edit) return h(v);
-  return '<span class="editable" contenteditable="true" spellcheck="false" data-path="'+h(path)+'" onpaste="onEditablePaste(event)" onblur="onEditableBlur(event)">'+h(v)+'</span>';
+  return '<span class="editable" contenteditable="true" spellcheck="false" data-path="'+h(path)+'" onclick="event.stopPropagation()" onpaste="onEditablePaste(event)" onblur="onEditableBlur(event)">'+h(v)+'</span>';
 }
 function editableBlock(path, value){
   var v = ed(path, value);
   if (!STATE.edit) return richHtml(v);
-  return '<div class="editable editable-block" contenteditable="true" spellcheck="false" data-path="'+h(path)+'" onpaste="onContentPaste(event)" onblur="onContentBlur(event)">'+richHtml(v)+'</div>';
+  return '<div class="editable editable-block" contenteditable="true" spellcheck="false" data-path="'+h(path)+'" onclick="event.stopPropagation()" onmouseup="saveSelRange()" onkeyup="saveSelRange()" onpaste="onContentPaste(event)" onblur="onContentBlur(event)">'+richHtml(v)+'</div>'+'<button class="add-media-btn" onclick="event.stopPropagation();insertImageAtCursor(\''+h(path)+'\')">'+svgIcon('edit',{size:12})+' Inserir imagem no texto</button>';
 }
 function onEditablePaste(e){ e.preventDefault(); var text = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, text); }
 function onEditableBlur(e){ var el = e.target; setEditPath(el.getAttribute('data-path'), el.innerText); }
 function looksHtml(v){ return typeof v==='string' && /</.test(v); }
-function richHtml(v){ if (v==null) return ''; return looksHtml(v) ? v : h(v).replace(/\n/g,'<br>'); }
+function looksMd(v){ return typeof v==='string' && /(^|\n)\s{0,3}#{1,6}\s|\*\*[^*]+\*\*|(^|\n)\s{0,3}[-*]\s/.test(v); }
+function mdInline(s){
+  s = h(s);
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  return s;
+}
+function mdToHtml(src){
+  var lines = String(src||'').replace(/\r\n/g,'\n').split('\n');
+  var out = []; var inList = false;
+  lines.forEach(function(line){
+    var l = line.trim();
+    if (!l){ if (inList){ out.push('</ul>'); inList=false; } return; }
+    var m;
+    if (m = l.match(/^(#{1,6})\s+(.*)$/)){
+      if (inList){ out.push('</ul>'); inList=false; }
+      var lvl = Math.min(m[1].length+1, 4);
+      out.push('<h'+lvl+'>'+mdInline(m[2])+'</h'+lvl+'>');
+    } else if (m = l.match(/^[-*]\s+(.*)$/)){
+      if (!inList){ out.push('<ul>'); inList=true; }
+      out.push('<li>'+mdInline(m[1])+'</li>');
+    } else {
+      if (inList){ out.push('</ul>'); inList=false; }
+      out.push('<p>'+mdInline(l)+'</p>');
+    }
+  });
+  if (inList) out.push('</ul>');
+  return out.join('');
+}
+function richHtml(v){ if (v==null) return ''; if (looksHtml(v)) return v; if (looksMd(v)) return mdToHtml(v); return h(v).replace(/\n/g,'<br>'); }
+var __LAST_RANGE = null;
+function saveSelRange(){ var sel = window.getSelection(); if (sel && sel.rangeCount) __LAST_RANGE = sel.getRangeAt(0).cloneRange(); }
+function insertImageAtCursor(path){
+  var input = getUploadInput();
+  if (!input){ toast('Upload de imagem indisponível neste navegador.'); return; }
+  input.onchange = function(e){
+    var file = e.target.files && e.target.files[0];
+    input.value = '';
+    if (!file) return;
+    if (!/^image\//.test(file.type)){ toast('Selecione um arquivo de imagem.'); return; }
+    var reader = new FileReader();
+    reader.onload = function(){
+      var el = document.querySelector('[data-path="'+path+'"]');
+      if (!el) return;
+      el.focus();
+      try {
+        if (__LAST_RANGE){ var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(__LAST_RANGE); }
+      } catch(e2){}
+      document.execCommand('insertHTML', false, '<img src="'+reader.result+'" style="max-width:100%;display:block;margin:10px 0;border-radius:8px">');
+      setEditPath(path, el.innerHTML);
+      toast('Imagem inserida.');
+    };
+    reader.onerror = function(){ toast('Não foi possível ler o arquivo.'); };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
 function onContentPaste(e){
   var cd = e.clipboardData || window.clipboardData;
   var items = cd && cd.items;
@@ -242,15 +298,16 @@ function downloadFlipbookHtml(titulo, pagesHtml){
     '<meta name="viewport" content="width=device-width, initial-scale=1">'+
     '<title>'+h(titulo||'Flipbook')+' — RelyOn Academy</title>'+
     '<style>html,body{margin:0;background:#0B0F17;color:#fff;font-family:system-ui,sans-serif}'+
-    '.fp-page{position:relative;background:#121826;color:#fff;padding:30px 26px;box-sizing:border-box;font-size:14px;line-height:1.65;overflow:hidden;border:1px solid #2a3650;background-size:cover;background-position:center}'+
-    '.fp-page h1{font-size:19px;margin:6px 0 2px}.fp-page h2{font-size:12px;color:#94A3B8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:0}'+
-    '.fp-page h3{font-size:14px;color:#F59E0B;margin-bottom:10px}.fp-page blockquote{font-style:italic;border-left:3px solid #F59E0B;padding-left:10px;margin:0;font-size:13px}'+
-    '.fp-page ul{padding-left:18px;margin:0}.fp-page ul li{margin-bottom:6px;font-size:13px}'+
-    '.fp-text{font-size:13.5px;line-height:1.7}.fp-text img{max-width:100%;border-radius:6px;margin:8px 0;display:block}'+
-    '.fp-cover{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:linear-gradient(160deg,#182036,#121826)}'+
-    '.fp-img-wrap{margin:-30px -26px 12px;overflow:hidden}.fp-img-wrap img{width:100%;max-height:200px;object-fit:cover;display:block}'+
+    '.fp-page{position:relative;background:#f6f1e3;color:#2b2016;padding:34px 30px;box-sizing:border-box;font-family:Georgia,\'Times New Roman\',serif;font-size:14px;line-height:1.75;overflow:hidden;border:1px solid #d8cdae;background-size:cover;background-position:center;box-shadow:inset 0 0 50px rgba(60,40,10,.08)}'+
+    '.fp-page::after{content:\'\';position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.10),transparent 6%,transparent 94%,rgba(0,0,0,.10))}'+
+    '.fp-page h1{font-size:20px;margin:6px 0 2px;font-family:Georgia,serif}.fp-page h2{font-size:12px;color:#8a7a5c;text-transform:uppercase;letter-spacing:.05em;margin-bottom:0}'+
+    '.fp-page h3{font-size:15px;color:#a3620f;margin-bottom:10px;font-family:Georgia,serif}.fp-page blockquote{font-style:italic;border-left:3px solid #a3620f;padding-left:12px;margin:0;font-size:13px;color:#4a3d28}'+
+    '.fp-page ul{padding-left:20px;margin:0}.fp-page ul li{margin-bottom:6px;font-size:13px}'+
+    '.fp-text{font-family:Georgia,\'Times New Roman\',serif;font-size:14px;line-height:1.9;text-align:justify}.fp-text img{max-width:100%;border-radius:4px;margin:10px 0;display:block;box-shadow:0 2px 10px rgba(0,0,0,.18)}'+
+    '.fp-cover{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:linear-gradient(160deg,#2b2016,#1a140d);color:#f0e6d2}.fp-cover h1{color:#f0e6d2}.fp-cover h2{color:#c9a86a}'+
+    '.fp-img-wrap{margin:-34px -30px 14px;overflow:hidden}.fp-img-wrap img{width:100%;max-height:200px;object-fit:cover;display:block}'+
     '.fp-page-full-img{padding:0}.fp-page-full-img img{width:100%;height:100%;object-fit:cover;display:block}'+
-    'body{display:flex;justify-content:center;padding:20px}#fp-book{width:100%;max-width:800px}</style>'+
+    'body{display:flex;justify-content:center;padding:20px;background:#0B0F17}#fp-book{width:100%;max-width:800px;filter:drop-shadow(0 18px 40px rgba(0,0,0,.5))}</style>'+
     '<script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"><\/script>'+
     '</head><body><div id="fp-book">'+pagesHtml.join('')+'</div>'+
     '<script>var pf=new St.PageFlip(document.getElementById("fp-book"),{width:380,height:540,size:"stretch",minWidth:300,maxWidth:700,minHeight:420,maxHeight:820,maxShadowOpacity:0.5,showCover:true,mobileScrollSupport:true,usePortrait:true});pf.loadFromHTML(document.querySelectorAll(".fp-page"));<\/script>'+
@@ -299,7 +356,7 @@ function openLessonFlipbook(courseId, mi, ai){
     var imgEquip = normImgEquip(primaryNormKey);
     if (imgEquip && imgEquip.url) images.push({url:imgEquip.url, alt:imgEquip.alt||''});
   }
-  openFlipbook(titulo, buildFlipbookPages(titulo, mod.num+' · '+mod.titulo, content, trecho, equip, manuais, images));
+  openFlipbook(titulo, buildFlipbookPages(titulo, mod.num+' · '+ed('modules.'+courseId+'.'+mi+'.titulo', mod.titulo), content, trecho, equip, manuais, images));
 }
 function openNormFlipbook(key){
   var n = NORMS[key]; if (!n) return;
@@ -549,7 +606,7 @@ function lessonPanel(courseId, mi, ai){
   var equipHtml = showEquip ? ('<div class="norm-sub"><div class="norm-sub-h">'+svgIcon('wrench',{size:14})+'Equipamentos técnicos</div>'+equipBody(primaryNormKey, primaryNorm.equip)+'</div>') : '';
   var manHtml = showMan ? ('<div class="norm-sub"><div class="norm-sub-h">'+svgIcon('book',{size:14})+'Manuais e referências oficiais</div><div class="norm-man">'+manuaisBody(primaryNormKey, primaryNorm.manuais)+'</div></div>') : '';
   var flipBtn = '<button class="btn btn-ghost flip-btn" onclick="openLessonFlipbook(\''+courseId+'\','+mi+','+ai+')">'+svgIcon('book',{size:14})+' Abrir como Flipbook</button>';
-  return '<div class="lesson-panel">'+'<div class="lesson-panel-h"><span class="chip">'+h(mod.num)+' · Módulo '+h(mod.titulo)+'</span></div>'+'<h2 class="lesson-title">'+editableText(path+'.titulo', a.titulo)+'</h2>'+'<div class="lesson-norms">'+normChips+fonte+flipBtn+'</div>'+mediaHtml+content+trecho+equipHtml+manHtml+'</div>';
+  return '<div class="lesson-panel">'+'<div class="lesson-panel-h"><span class="chip">'+h(mod.num)+' · Módulo '+h(ed('modules.'+courseId+'.'+mi+'.titulo', mod.titulo))+'</span></div>'+'<h2 class="lesson-title">'+editableText(path+'.titulo', a.titulo)+'</h2>'+'<div class="lesson-norms">'+normChips+fonte+flipBtn+'</div>'+mediaHtml+content+trecho+equipHtml+manHtml+'</div>';
 }
 function accordionHtml(courseId, mods){
   var openMap = ACCORDION_OPEN[courseId] || {};
@@ -559,10 +616,9 @@ function accordionHtml(courseId, mods){
     var aulas = m.aulas.map(function(a, ai){
       var isActive = active.mi===mi && active.ai===ai;
       var normChips = (a.norms||[]).map(function(nk){ var n = NORMS[nk]; return n ? '<span class="aula-norm-mini">'+h(n.code)+'</span>' : ''; }).join('');
-      var titEff = ed('lessons.'+courseId+'.'+mi+'.'+ai+'.titulo', a.titulo);
-      return '<li class="aula-row'+(isActive?' aula-active':'')+'" onclick="selectLesson(\''+courseId+'\','+mi+','+ai+')">'+'<span class="aula-num">'+(ai+1)+'</span><span class="aula-tit">'+h(titEff)+'</span><span class="aula-norms">'+normChips+'</span></li>';
+      return '<li class="aula-row'+(isActive?' aula-active':'')+'" onclick="selectLesson(\''+courseId+'\','+mi+','+ai+')">'+'<span class="aula-num">'+(ai+1)+'</span><span class="aula-tit">'+editableText('lessons.'+courseId+'.'+mi+'.'+ai+'.titulo', a.titulo)+'</span><span class="aula-norms">'+normChips+'</span></li>';
     }).join('');
-    return '<div class="acc-block'+(isOpen?' acc-open':'')+'">'+'<div class="acc-head" onclick="toggleAccordion(\''+courseId+'\','+mi+')"><span class="mod-num">'+h(m.num)+'</span><span class="acc-tit">'+h(m.titulo)+'</span>'+svgIcon('chev',{size:14})+'</div>'+'<ul class="aula-list">'+aulas+'</ul></div>';
+    return '<div class="acc-block'+(isOpen?' acc-open':'')+'">'+'<div class="acc-head" onclick="toggleAccordion(\''+courseId+'\','+mi+')"><span class="mod-num">'+h(m.num)+'</span><span class="acc-tit">'+editableText('modules.'+courseId+'.'+mi+'.titulo', m.titulo)+'</span>'+svgIcon('chev',{size:14})+'</div>'+'<ul class="aula-list">'+aulas+'</ul></div>';
   }).join('');
 }
 function pCurso(id){
