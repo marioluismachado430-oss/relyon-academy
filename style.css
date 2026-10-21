@@ -250,3 +250,15 @@ a{color:inherit;text-decoration:none}
 .fp-page-full-img{padding:0;overflow:hidden}
 .fp-page-full-img img{width:100%;height:100%;object-fit:contain;display:block;background:#2b2016}
 .flip-btn{margin-left:8px}
+
+/* listas de vídeos/links/slides por aula */
+.lesson-list-group{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
+.lesson-list-h{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+
+/* editor de texto em janela ampliada */
+.txted-overlay{position:absolute;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10}
+.txted-modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:min(760px,96vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
+.txted-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line)}
+.txted-actions{display:flex;gap:8px}
+.txted-area{flex:1;overflow-y:auto;padding:20px;font-size:15px;line-height:1.7;min-height:320px}
+.txted-foot{padding:14px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end}

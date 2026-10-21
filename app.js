@@ -79,7 +79,7 @@ function editableText(path, value){
 function editableBlock(path, value){
   var v = ed(path, value);
   if (!STATE.edit) return richHtml(v);
-  return '<div class="editable editable-block" contenteditable="true" spellcheck="false" data-path="'+h(path)+'" onclick="event.stopPropagation()" onmouseup="saveSelRange()" onkeyup="saveSelRange()" onpaste="onContentPaste(event)" onblur="onContentBlur(event)">'+richHtml(v)+'</div>'+'<button class="add-media-btn" onclick="event.stopPropagation();insertImageAtCursor(\''+h(path)+'\')">'+svgIcon('edit',{size:12})+' Inserir imagem no texto</button>';
+  return '<div class="editable editable-block" contenteditable="true" spellcheck="false" data-path="'+h(path)+'" onclick="event.stopPropagation()" onmouseup="saveSelRange()" onkeyup="saveSelRange()" onpaste="onContentPaste(event)" onblur="onContentBlur(event)">'+richHtml(v)+'</div>'+'<button class="add-media-btn" onclick="event.stopPropagation();insertImageAtCursor(\''+h(path)+'\')">'+svgIcon('edit',{size:12})+' Inserir imagem no texto</button>'+'<button class="add-media-btn" onclick="event.stopPropagation();openTextEditor(\''+h(path)+'\')">'+svgIcon('doc',{size:12})+' Editar em janela ampliada</button>';
 }
 function onEditablePaste(e){ e.preventDefault(); var text = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, text); }
 function onEditableBlur(e){ var el = e.target; setEditPath(el.getAttribute('data-path'), el.innerText); }
@@ -289,6 +289,52 @@ function flipbookLogHtml(){
 function editMediaLinkPrompt(path){ var cur = ed(path+'.media', {type:'video', url:'', alt:'Assistir vídeo'}); var url = window.prompt('URL do vídeo:', cur.url||''); if (url===null) return; var alt = window.prompt('Rótulo exibido no link:', cur.alt||'Assistir vídeo'); setEditPath(path+'.media', {type:'video', url:url, alt:alt||'Assistir vídeo'}); render(); }
 function editEmbedPrompt(path){ var cur = ed(path+'.media', {url:''}); var url = window.prompt('URL do embed:', cur.url||''); if (url===null) return; setEditPath(path+'.media', {type:'embed', url:url}); render(); }
 function editVideoUsoPrompt(path){ var cur = ed(path+'.videoUso', {titulo:'', url:''}); var url = window.prompt('URL do vídeo de utilização:', cur.url||''); if (url===null) return; var titulo = window.prompt('Título do vídeo:', cur.titulo||''); setEditPath(path+'.videoUso', {titulo: titulo||'', url:url}); render(); }
+function listItemLabels(path){
+  if (/\.videos$/.test(path)) return {t:'Título do vídeo:', u:'URL do vídeo (YouTube, etc.):'};
+  if (/\.links$/.test(path)) return {t:'Título da reportagem/link:', u:'URL da reportagem/link:'};
+  if (/\.slides$/.test(path)) return {t:'Título dos slides/apresentação:', u:'URL dos slides (Google Slides, PDF, PPT publicado, etc.):'};
+  return {t:'Título:', u:'URL:'};
+}
+function promptListItem(path, cur){
+  cur = cur || {titulo:'', url:''};
+  var lbl = listItemLabels(path);
+  var titulo = window.prompt(lbl.t, cur.titulo||'');
+  if (titulo===null) return null;
+  var url = window.prompt(lbl.u, cur.url||'');
+  if (url===null) return null;
+  return {titulo: titulo||'', url: url};
+}
+function addListItem(path){
+  var item = promptListItem(path);
+  if (!item || !item.url) return;
+  var arr = (ed(path, [])||[]).slice();
+  arr.push(item);
+  setEditPath(path, arr);
+  render();
+}
+function editListItem(path, idx){
+  var arr = (ed(path, [])||[]).slice();
+  var item = promptListItem(path, arr[idx]);
+  if (!item) return;
+  arr[idx] = item;
+  setEditPath(path, arr);
+  render();
+}
+function removeListItem(path, idx){
+  if (!window.confirm('Remover este item?')) return;
+  var arr = (ed(path, [])||[]).slice();
+  arr.splice(idx, 1);
+  setEditPath(path, arr);
+  render();
+}
+function listSectionHtml(path, icon, addLabel){
+  var arr = ed(path, []) || [];
+  var rows = arr.map(function(it, idx){
+    return '<a class="media-row" href="'+h(it.url)+'" target="_blank" rel="noopener">'+svgIcon(icon,{size:16})+'<span>'+h(it.titulo||it.url)+'</span>'+svgIcon('chev',{size:13})+'</a>'+(STATE.edit?('<button class="edit-inline-btn" onclick="event.preventDefault();editListItem(\''+path+'\','+idx+')">'+svgIcon('edit',{size:12})+'</button><button class="edit-inline-btn" onclick="event.preventDefault();removeListItem(\''+path+'\','+idx+')">'+svgIcon('close',{size:12})+'</button>'):'');
+  }).join('');
+  var addBtn = STATE.edit ? ('<button class="add-media-btn" onclick="addListItem(\''+path+'\')">'+svgIcon('edit',{size:14})+' '+addLabel+'</button>') : '';
+  return rows + addBtn;
+}
 function bgEditBtn(path){ if (!STATE.edit) return ''; return '<button class="bg-edit-btn" onclick="event.stopPropagation();event.preventDefault();editImagePrompt(\''+path+'\')">'+svgIcon('edit',{size:13})+' Imagem</button>'; }
 function equipBody(key, arr){
   var ovArr = ed('norms.'+key+'.equip', null);
@@ -406,6 +452,49 @@ function openFlipbook(titulo, pagesHtml){
   } catch(e){ toast('Não foi possível abrir o flipbook.'); }
 }
 function closeFlipbook(){ if (window.__fp){ try { window.__fp.destroy(); } catch(e){} window.__fp = null; } var layer = document.getElementById('layer'); layer.classList.remove('open'); layer.innerHTML = ''; }
+function openTextEditor(path){
+  var layer = document.getElementById('layer');
+  var val = ed(path, '');
+  layer.innerHTML = '<div class="txted-overlay" onclick="if(event.target===this) closeTextEditor()">'+
+    '<div class="txted-modal" onclick="event.stopPropagation()">'+
+      '<div class="txted-head"><strong>Editar texto</strong><div class="txted-actions">'+
+        '<button class="icon-btn" onclick="insertImageInTextEditor()" title="Inserir imagem">'+svgIcon('edit',{size:16})+'</button>'+
+        '<button class="icon-btn" onclick="closeTextEditor()" title="Fechar sem salvar">'+svgIcon('close',{size:16})+'</button>'+
+      '</div></div>'+
+      '<div id="txted-area" class="editable editable-block txted-area" contenteditable="true" spellcheck="false" onmouseup="saveSelRange()" onkeyup="saveSelRange()" onpaste="onContentPaste(event)">'+richHtml(val)+'</div>'+
+      '<div class="txted-foot"><button class="btn btn-primary" onclick="saveTextEditor(\''+h(path)+'\')">Salvar e fechar</button></div>'+
+    '</div></div>';
+  layer.classList.add('open');
+}
+function saveTextEditor(path){
+  var el = document.getElementById('txted-area');
+  if (el) setEditPath(path, el.innerHTML);
+  closeTextEditor();
+  render();
+  toast('Texto salvo.');
+}
+function closeTextEditor(){ var layer = document.getElementById('layer'); layer.classList.remove('open'); layer.innerHTML = ''; }
+function insertImageInTextEditor(){
+  var input = getUploadInput();
+  if (!input){ toast('Upload de imagem indisponível neste navegador.'); return; }
+  input.onchange = function(e){
+    var file = e.target.files && e.target.files[0];
+    input.value = '';
+    if (!file) return;
+    if (!/^image\//.test(file.type)){ toast('Selecione um arquivo de imagem.'); return; }
+    var reader = new FileReader();
+    reader.onload = function(){
+      var el = document.getElementById('txted-area');
+      if (!el) return;
+      el.focus();
+      try { if (__LAST_RANGE){ var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(__LAST_RANGE); } } catch(e2){}
+      document.execCommand('insertHTML', false, '<img src="'+reader.result+'" style="max-width:100%;display:block;margin:10px 0;border-radius:8px">');
+    };
+    reader.onerror = function(){ toast('Não foi possível ler o arquivo.'); };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
 function lessonFlipbookData(courseId, mi, ai){
   var mods = MODULES_BY_COURSE[courseId]; var mod = mods[mi]; var a = mod.aulas[ai];
   var path = 'lessons.'+courseId+'.'+mi+'.'+ai;
@@ -677,6 +766,10 @@ function lessonMediaHtml(path, a){
   else if (STATE.edit){ rows += '<button class="add-media-btn" onclick="addLessonMedia(\''+path+'\')">'+svgIcon('edit',{size:14})+' Adicionar imagem/vídeo desta aula</button>'; }
   if (vu && vu.url){ rows += '<a class="media-row media-uso" href="'+h(vu.url)+'" target="_blank" rel="noopener">'+svgIcon('video',{size:16})+'<span><strong>Vídeo de utilização do equipamento</strong><br>'+h(vu.titulo)+'</span>'+svgIcon('chev',{size:13})+'</a>'+(STATE.edit ? '<button class="edit-inline-btn" onclick="event.preventDefault();editVideoUsoPrompt(\''+path+'\')">'+svgIcon('edit',{size:12})+'</button>' : ''); }
   else if (STATE.edit){ rows += '<button class="add-media-btn" onclick="editVideoUsoPrompt(\''+path+'\')">'+svgIcon('edit',{size:14})+' Adicionar vídeo de utilização do equipamento</button>'; }
+  var videosArr = ed(path+'.videos', []); var linksArr = ed(path+'.links', []); var slidesArr = ed(path+'.slides', []);
+  if (STATE.edit || videosArr.length){ rows += '<div class="lesson-list-group"><div class="lesson-list-h">'+svgIcon('video',{size:14})+'Vídeos</div>'+listSectionHtml(path+'.videos','video','Adicionar vídeo')+'</div>'; }
+  if (STATE.edit || linksArr.length){ rows += '<div class="lesson-list-group"><div class="lesson-list-h">'+svgIcon('news',{size:14})+'Reportagens e links</div>'+listSectionHtml(path+'.links','news','Adicionar reportagem/link')+'</div>'; }
+  if (STATE.edit || slidesArr.length){ rows += '<div class="lesson-list-group"><div class="lesson-list-h">'+svgIcon('doc',{size:14})+'Slides</div>'+listSectionHtml(path+'.slides','doc','Adicionar slides')+'</div>'; }
   return rows;
 }
 function lessonPanel(courseId, mi, ai){
