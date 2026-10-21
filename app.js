@@ -507,7 +507,7 @@ function insertImageInTextEditor(){
   input.click();
 }
 function lessonFlipbookData(courseId, mi, ai){
-  var mods = MODULES_BY_COURSE[courseId]; var mod = mods[mi]; var a = mod.aulas[ai];
+  var mods = effMods(courseId); var mod = mods[mi]; var a = mod.aulas[ai];
   var path = 'lessons.'+courseId+'.'+mi+'.'+ai;
   var titulo = ed(path+'.titulo', a.titulo);
   var content = ed(path+'.content', a.content||'');
@@ -767,6 +767,40 @@ var ACTIVE_LESSON = {};
 var ACCORDION_OPEN = {};
 function selectLesson(courseId, mi, ai){ ACTIVE_LESSON[courseId] = {mi:mi, ai:ai}; ACCORDION_OPEN[courseId] = ACCORDION_OPEN[courseId] || {}; ACCORDION_OPEN[courseId][mi] = true; render(); }
 function toggleAccordion(courseId, mi){ ACCORDION_OPEN[courseId] = ACCORDION_OPEN[courseId] || {}; ACCORDION_OPEN[courseId][mi] = !ACCORDION_OPEN[courseId][mi]; render(); }
+function effMods(courseId){ return ed('modsData.'+courseId, MODULES_BY_COURSE[courseId]||[]); }
+function mutMods(courseId, fn){
+  var mods = JSON.parse(JSON.stringify(effMods(courseId)));
+  fn(mods);
+  setEditPath('modsData.'+courseId, mods);
+  render();
+}
+function firstValidLesson(mods){
+  for (var mi=0; mi<mods.length; mi++){
+    if (mods[mi].removido) continue;
+    for (var ai=0; ai<mods[mi].aulas.length; ai++){ if (!mods[mi].aulas[ai].removido) return {mi:mi, ai:ai}; }
+  }
+  return null;
+}
+function addModulo(courseId){
+  var titulo = window.prompt('Título do novo módulo:'); if (!titulo) return;
+  mutMods(courseId, function(mods){ mods.push({num:String(mods.filter(function(m){return !m.removido;}).length+1).padStart(2,'0'), titulo:titulo, aulas:[]}); });
+}
+function removeModulo(courseId, mi){
+  if (!window.confirm('Remover este módulo e todas as suas aulas?')) return;
+  mutMods(courseId, function(mods){ mods[mi].removido = true; });
+  var act = ACTIVE_LESSON[courseId];
+  if (act && act.mi===mi) ACTIVE_LESSON[courseId] = firstValidLesson(effMods(courseId));
+}
+function addAula(courseId, mi){
+  var titulo = window.prompt('Título da nova aula:'); if (!titulo) return;
+  mutMods(courseId, function(mods){ mods[mi].aulas.push({titulo:titulo, norms:[], media:{type:'none'}, content:''}); });
+}
+function removeAula(courseId, mi, ai){
+  if (!window.confirm('Remover esta aula?')) return;
+  mutMods(courseId, function(mods){ mods[mi].aulas[ai].removido = true; });
+  var act = ACTIVE_LESSON[courseId];
+  if (act && act.mi===mi && act.ai===ai) ACTIVE_LESSON[courseId] = firstValidLesson(effMods(courseId));
+}
 function lessonMediaHtml(path, a){
   var media = ed(path+'.media', a.media || {type:'none'});
   var vu = ed(path+'.videoUso', a.videoUso || null);
@@ -785,8 +819,9 @@ function lessonMediaHtml(path, a){
   return rows;
 }
 function lessonPanel(courseId, mi, ai){
-  var mods = MODULES_BY_COURSE[courseId];
-  var mod = mods[mi]; var a = mod.aulas[ai];
+  var mods = effMods(courseId);
+  var mod = mods[mi]; var a = mod && mod.aulas[ai];
+  if (!mod || !a || mod.removido || a.removido) return '<div class="lesson-panel"><p class="muted">Selecione uma aula.</p></div>';
   var path = 'lessons.'+courseId+'.'+mi+'.'+ai;
   var normChips = (a.norms||[]).map(function(nk){ var n = NORMS[nk]; if (!n) return ''; return '<a class="norm-tag" href="'+normUrl(n.code)+'">'+svgIcon('scale',{size:13})+h(n.code)+'</a>'; }).join('');
   var primaryNormKey = (a.norms && a.norms[0]) ? a.norms[0] : null;
@@ -799,30 +834,40 @@ function lessonPanel(courseId, mi, ai){
   var showMan = primaryNormKey && (STATE.edit || (primaryNorm.manuais && primaryNorm.manuais.length));
   var equipHtml = showEquip ? ('<div class="norm-sub"><div class="norm-sub-h">'+svgIcon('wrench',{size:14})+'Equipamentos técnicos</div>'+equipBody(primaryNormKey, primaryNorm.equip)+'</div>') : '';
   var manHtml = showMan ? ('<div class="norm-sub"><div class="norm-sub-h">'+svgIcon('book',{size:14})+'Manuais e referências oficiais</div><div class="norm-man">'+manuaisBody(primaryNormKey, primaryNorm.manuais)+'</div></div>') : '';
-  var flipBtn = '<button class="btn btn-ghost flip-btn" onclick="openLessonFlipbook(\''+courseId+'\','+mi+','+ai+')">'+svgIcon('book',{size:14})+' Abrir como Flipbook</button>'+' <button class="btn btn-ghost flip-btn" onclick="downloadLessonFlipbook(\''+courseId+'\','+mi+','+ai+')">'+svgIcon('download',{size:14})+' Baixar flipbook</button>';
+  var flipBtn = '<button class="btn btn-ghost flip-btn" onclick="openLessonFlipbook(\''+courseId+'\','+mi+','+ai+')">'+svgIcon('book',{size:14})+' Abrir como Flipbook</button>'+' <button class="btn btn-ghost flip-btn" onclick="downloadLessonFlipbook(\''+courseId+'\','+mi+','+ai+')">'+svgIcon('download',{size:14})+' Baixar flipbook</button>'+(STATE.edit?' <button class="btn btn-ghost flip-btn" onclick="removeAula(\''+courseId+'\','+mi+','+ai+')">'+svgIcon('close',{size:14})+' Remover aula</button>':'');
   return '<div class="lesson-panel">'+'<div class="lesson-panel-h"><span class="chip">'+h(mod.num)+' · Módulo '+h(ed('modules.'+courseId+'.'+mi+'.titulo', mod.titulo))+'</span></div>'+'<h2 class="lesson-title">'+editableText(path+'.titulo', a.titulo)+'</h2>'+'<div class="lesson-norms">'+normChips+fonte+flipBtn+'</div>'+mediaHtml+content+trecho+equipHtml+manHtml+'</div>';
 }
 function accordionHtml(courseId, mods){
   var openMap = ACCORDION_OPEN[courseId] || {};
-  var active = ACTIVE_LESSON[courseId] || {mi:0, ai:0};
-  return mods.map(function(m, mi){
+  var active = ACTIVE_LESSON[courseId] || {mi:-1, ai:-1};
+  var blocks = mods.map(function(m, mi){
+    if (m.removido) return '';
     var isOpen = openMap[mi] !== false;
     var aulas = m.aulas.map(function(a, ai){
+      if (a.removido) return '';
       var isActive = active.mi===mi && active.ai===ai;
       var normChips = (a.norms||[]).map(function(nk){ var n = NORMS[nk]; return n ? '<span class="aula-norm-mini">'+h(n.code)+'</span>' : ''; }).join('');
-      return '<li class="aula-row'+(isActive?' aula-active':'')+'" onclick="selectLesson(\''+courseId+'\','+mi+','+ai+')">'+'<span class="aula-num">'+(ai+1)+'</span><span class="aula-tit">'+editableText('lessons.'+courseId+'.'+mi+'.'+ai+'.titulo', a.titulo)+'</span><span class="aula-norms">'+normChips+'</span></li>';
+      return '<li class="aula-row'+(isActive?' aula-active':'')+'" onclick="selectLesson(\''+courseId+'\','+mi+','+ai+')">'+'<span class="aula-num">'+(ai+1)+'</span><span class="aula-tit">'+editableText('lessons.'+courseId+'.'+mi+'.'+ai+'.titulo', a.titulo)+'</span><span class="aula-norms">'+normChips+'</span>'+(STATE.edit?'<button class="edit-inline-btn" onclick="event.stopPropagation();removeAula(\''+courseId+'\','+mi+','+ai+')">'+svgIcon('close',{size:11})+'</button>':'')+'</li>';
     }).join('');
-    return '<div class="acc-block'+(isOpen?' acc-open':'')+'">'+'<div class="acc-head" onclick="toggleAccordion(\''+courseId+'\','+mi+')"><span class="mod-num">'+h(m.num)+'</span><span class="acc-tit">'+editableText('modules.'+courseId+'.'+mi+'.titulo', m.titulo)+'</span>'+svgIcon('chev',{size:14})+'</div>'+'<ul class="aula-list">'+aulas+'</ul></div>';
+    if (STATE.edit) aulas += '<li class="aula-row" style="cursor:pointer" onclick="event.stopPropagation();addAula(\''+courseId+'\','+mi+')">'+svgIcon('edit',{size:13})+'<span class="aula-tit muted"> Adicionar aula</span></li>';
+    return '<div class="acc-block'+(isOpen?' acc-open':'')+'">'+'<div class="acc-head" onclick="toggleAccordion(\''+courseId+'\','+mi+')"><span class="mod-num">'+h(m.num)+'</span><span class="acc-tit">'+editableText('modules.'+courseId+'.'+mi+'.titulo', m.titulo)+'</span>'+svgIcon('chev',{size:14})+(STATE.edit?'<button class="edit-inline-btn" onclick="event.stopPropagation();removeModulo(\''+courseId+'\','+mi+')">'+svgIcon('close',{size:12})+'</button>':'')+'</div>'+'<ul class="aula-list">'+aulas+'</ul></div>';
   }).join('');
+  if (STATE.edit) blocks += '<button class="add-media-btn btn-block" onclick="addModulo(\''+courseId+'\')">'+svgIcon('edit',{size:14})+' Adicionar módulo</button>';
+  return blocks;
 }
 function pCurso(id){
   var c = byId(COURSES, id);
   if (!c) return '<section class="section"><p>Curso não encontrado.</p></section>';
-  var mods = MODULES_BY_COURSE[id];
+  var mods = effMods(id);
   var img = courseImgEff(c);
   var head = '<section class="course-hero" style="position:relative;background-image:linear-gradient(180deg,rgba(0,0,0,.2),rgba(0,0,0,.75)),url('+h(img.url)+')">'+bgEditBtn('courses.'+c.id+'.img')+'<span class="chip">'+h(c.sigla)+'</span><h1>'+editableText('courses.'+c.id+'.nome', c.nome)+'</h1><p>'+editableBlock('courses.'+c.id+'.desc', c.desc)+'</p>'+'<div class="strip">'+stripCell('Carga horária', c.carga)+stripCell('Módulos', c.modulos)+stripCell('Aulas', c.aulas)+stripCell('Nível', c.nivel)+stripCell('Progresso', c.progresso+'%')+'</div></section>';
-  if (!mods){ var fallback = '<div class="modulo-block"><p class="muted">Conteúdo detalhado deste curso está em preparação. Consulte a Biblioteca Técnica para as normas aplicáveis à área de '+h(areaName(c.area))+'.</p></div>'; return head+'<section class="section"><h2>Módulos e aulas</h2>'+fallback+'</section>'; }
-  if (!ACTIVE_LESSON[id]) ACTIVE_LESSON[id] = {mi:0, ai:0};
+  if (!mods || !mods.length){
+    if (!STATE.edit) { var fallback = '<div class="modulo-block"><p class="muted">Conteúdo detalhado deste curso está em preparação. Consulte a Biblioteca Técnica para as normas aplicáveis à área de '+h(areaName(c.area))+'.</p></div>'; return head+'<section class="section"><h2>Módulos e aulas</h2>'+fallback+'</section>'; }
+    return head+'<section class="section"><h2>Módulos e aulas</h2>'+'<div class="modulo-block">'+accordionHtml(id, mods||[])+'</div></section>';
+  }
+  if (!ACTIVE_LESSON[id] || !effMods(id)[ACTIVE_LESSON[id].mi] || effMods(id)[ACTIVE_LESSON[id].mi].removido || !effMods(id)[ACTIVE_LESSON[id].mi].aulas[ACTIVE_LESSON[id].ai] || effMods(id)[ACTIVE_LESSON[id].mi].aulas[ACTIVE_LESSON[id].ai].removido){
+    ACTIVE_LESSON[id] = firstValidLesson(mods) || {mi:0, ai:0};
+  }
   var active = ACTIVE_LESSON[id];
   return head+'<section class="section"><h2>Módulos e aulas</h2>'+'<div class="course-split">'+'<div class="course-split-left">'+accordionHtml(id, mods)+'</div>'+'<div class="course-split-right">'+lessonPanel(id, active.mi, active.ai)+'</div>'+'</div></section>';
 }
