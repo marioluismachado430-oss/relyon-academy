@@ -13,8 +13,10 @@
 <div id="app"></div>
 <div id="layer"></div>
 <input type="file" id="img-upload-input" accept="image/*" style="display:none">
+<input type="file" id="pdf-upload-input" accept="application/pdf" style="display:none">
 <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>if (window.pdfjsLib) { pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }</script>
 <script src="app.js"></script>
 </body>
 </html>
-

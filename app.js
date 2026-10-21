@@ -198,15 +198,93 @@ function editImagePrompt(path){
   setEditPath(path, merged); render();
 }
 function addLessonMedia(path){
-  var t = window.prompt('Tipo de mídia — digite "imagem", "video" ou "embed":', 'imagem');
+  var t = window.prompt('Tipo de mídia — digite "imagem", "video", "embed" ou "pdf" (o PDF vira um flipbook automaticamente):', 'imagem');
   if (!t) return;
-  t = t.toLowerCase().trim(); if (['imagem','video','embed'].indexOf(t)<0) t='imagem';
+  t = t.toLowerCase().trim(); if (['imagem','video','embed','pdf'].indexOf(t)<0) t='imagem';
+  if (t==='pdf'){ handlePdfUpload(path+'.media'); return; }
   if (t==='imagem'){ var fromDevice = window.confirm('Enviar foto do seu computador ou celular?\n\nOK = escolher arquivo\nCancelar = colar um link (URL)'); if (fromDevice){ handleImageUpload(path+'.media', {type:'image', alt:''}); return; } }
   var url = window.prompt('URL da mídia:', '');
   if (url===null || url==='') return;
   var alt = t==='imagem' ? (window.prompt('Descrição da imagem (alt):','')||'') : (window.prompt('Rótulo exibido no link:','Assistir vídeo')||'Assistir vídeo');
   var typeMap = {imagem:'image', video:'video', embed:'embed'};
   setEditPath(path+'.media', {type:typeMap[t], url:url, alt:alt}); render();
+}
+function getPdfInput(){ return document.getElementById('pdf-upload-input'); }
+function handlePdfUpload(path){
+  var input = getPdfInput();
+  if (!input){ toast('Upload de PDF indisponível neste navegador.'); return; }
+  input.onchange = function(e){
+    var file = e.target.files && e.target.files[0];
+    input.value = '';
+    if (!file) return;
+    if (file.type!=='application/pdf' && !/\.pdf$/i.test(file.name)){ toast('Selecione um arquivo PDF.'); return; }
+    if (!window.pdfjsLib){ toast('Biblioteca de PDF não carregou — verifique sua conexão.'); return; }
+    toast('Convertendo PDF em páginas…');
+    var reader = new FileReader();
+    reader.onload = function(){
+      var typedarray = new Uint8Array(reader.result);
+      pdfjsLib.getDocument({data: typedarray}).promise.then(function(pdf){
+        var pages = []; var n = pdf.numPages;
+        function renderPage(i){
+          return pdf.getPage(i).then(function(page){
+            var viewport = page.getViewport({scale: 1.4});
+            var canvas = document.createElement('canvas');
+            canvas.width = viewport.width; canvas.height = viewport.height;
+            var ctx = canvas.getContext('2d');
+            return page.render({canvasContext: ctx, viewport: viewport}).promise.then(function(){
+              pages.push(canvas.toDataURL('image/jpeg', 0.82));
+            });
+          });
+        }
+        var chain = Promise.resolve();
+        for (var i=1;i<=n;i++){ (function(i2){ chain = chain.then(function(){ return renderPage(i2); }); })(i); }
+        chain.then(function(){
+          setEditPath(path, {type:'pdf', pages: pages, nome: file.name});
+          render();
+          toast('PDF convertido: '+pages.length+' página(s).');
+        }).catch(function(){ toast('Erro ao converter o PDF.'); });
+      }).catch(function(){ toast('Não foi possível abrir o PDF.'); });
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  input.click();
+}
+function openPdfFlipbook(path){
+  var media = ed(path, {type:'none'});
+  if (!media || media.type!=='pdf' || !media.pages || !media.pages.length){ toast('PDF não encontrado.'); return; }
+  var titulo = media.nome || 'Documento PDF';
+  var pages = media.pages.map(function(p){ return '<div class="fp-page fp-page-full-img"><img src="'+p+'" alt="PDF"></div>'; });
+  logFlipbook(titulo, 'pdf', {path:path});
+  openFlipbook(titulo, pages);
+}
+function downloadPdfFlipbook(path){
+  var media = ed(path, {type:'none'});
+  if (!media || media.type!=='pdf' || !media.pages || !media.pages.length){ toast('PDF não encontrado.'); return; }
+  var pages = media.pages.map(function(p){ return '<div class="fp-page fp-page-full-img"><img src="'+p+'" alt="PDF"></div>'; });
+  downloadFlipbookHtml(media.nome || 'Documento PDF', pages);
+}
+function fpLog(){ try { return JSON.parse(localStorage.getItem('rly-fp-log')||'[]'); } catch(e){ return []; } }
+function fpLogSave(arr){ try { localStorage.setItem('rly-fp-log', JSON.stringify(arr.slice(-40))); } catch(e){} }
+function logFlipbook(titulo, kind, ref){
+  var arr = fpLog();
+  arr = arr.filter(function(it){ return !(it.kind===kind && JSON.stringify(it.ref)===JSON.stringify(ref)); });
+  arr.push({titulo:titulo, kind:kind, ref:ref, ts:Date.now()});
+  fpLogSave(arr);
+}
+function redownloadFlipbook(idx){
+  var arr = fpLog(); var it = arr[idx]; if (!it) return;
+  if (it.kind==='lesson'){ downloadLessonFlipbook(it.ref.courseId, it.ref.mi, it.ref.ai); }
+  else if (it.kind==='norm'){ downloadNormFlipbook(it.ref.key); }
+  else if (it.kind==='pdf'){ downloadPdfFlipbook(it.ref.path); }
+}
+function flipbookLogHtml(){
+  var arr = fpLog();
+  if (!arr.length) return '<p class="muted">Nenhum flipbook aberto ainda.</p>';
+  var rows = [];
+  for (var i=arr.length-1;i>=0;i--){ rows.push({it:arr[i], idx:i}); }
+  return rows.map(function(r){
+    return '<div class="media-row"><span>'+h(r.it.titulo)+'</span><button class="edit-inline-btn" onclick="redownloadFlipbook('+r.idx+')">'+svgIcon('download',{size:12})+' Baixar</button></div>';
+  }).join('');
 }
 function editMediaLinkPrompt(path){ var cur = ed(path+'.media', {type:'video', url:'', alt:'Assistir vídeo'}); var url = window.prompt('URL do vídeo:', cur.url||''); if (url===null) return; var alt = window.prompt('Rótulo exibido no link:', cur.alt||'Assistir vídeo'); setEditPath(path+'.media', {type:'video', url:url, alt:alt||'Assistir vídeo'}); render(); }
 function editEmbedPrompt(path){ var cur = ed(path+'.media', {url:''}); var url = window.prompt('URL do embed:', cur.url||''); if (url===null) return; setEditPath(path+'.media', {type:'embed', url:url}); render(); }
@@ -328,7 +406,7 @@ function openFlipbook(titulo, pagesHtml){
   } catch(e){ toast('Não foi possível abrir o flipbook.'); }
 }
 function closeFlipbook(){ if (window.__fp){ try { window.__fp.destroy(); } catch(e){} window.__fp = null; } var layer = document.getElementById('layer'); layer.classList.remove('open'); layer.innerHTML = ''; }
-function openLessonFlipbook(courseId, mi, ai){
+function lessonFlipbookData(courseId, mi, ai){
   var mods = MODULES_BY_COURSE[courseId]; var mod = mods[mi]; var a = mod.aulas[ai];
   var path = 'lessons.'+courseId+'.'+mi+'.'+ai;
   var titulo = ed(path+'.titulo', a.titulo);
@@ -341,14 +419,25 @@ function openLessonFlipbook(courseId, mi, ai){
   var images = [];
   var media = ed(path+'.media', a.media||{type:'none'});
   if (media && media.type==='image' && media.url) images.push({url:media.url, alt:media.alt||''});
+  if (media && media.type==='pdf' && media.pages && media.pages.length){ media.pages.forEach(function(p){ images.push({url:p, alt:media.nome||'PDF'}); }); }
   if (primaryNormKey){
     var imgEquip = normImgEquip(primaryNormKey);
     if (imgEquip && imgEquip.url) images.push({url:imgEquip.url, alt:imgEquip.alt||''});
   }
-  openFlipbook(titulo, buildFlipbookPages(titulo, mod.num+' · '+ed('modules.'+courseId+'.'+mi+'.titulo', mod.titulo), content, trecho, equip, manuais, images));
+  var pages = buildFlipbookPages(titulo, mod.num+' · '+ed('modules.'+courseId+'.'+mi+'.titulo', mod.titulo), content, trecho, equip, manuais, images);
+  return {titulo:titulo, pages:pages};
 }
-function openNormFlipbook(key){
-  var n = NORMS[key]; if (!n) return;
+function openLessonFlipbook(courseId, mi, ai){
+  var d = lessonFlipbookData(courseId, mi, ai);
+  logFlipbook(d.titulo, 'lesson', {courseId:courseId, mi:mi, ai:ai});
+  openFlipbook(d.titulo, d.pages);
+}
+function downloadLessonFlipbook(courseId, mi, ai){
+  var d = lessonFlipbookData(courseId, mi, ai);
+  downloadFlipbookHtml(d.titulo, d.pages);
+}
+function normFlipbookData(key){
+  var n = NORMS[key]; if (!n) return null;
   var titulo = ed('norms.'+key+'.titulo', n.titulo);
   var descricao = ed('norms.'+key+'.descricao', n.descricao||'');
   var trecho = ed('norms.'+key+'.trecho', n.trecho||'');
@@ -357,7 +446,17 @@ function openNormFlipbook(key){
   var images = [];
   var imgEquip = normImgEquip(key);
   if (imgEquip && imgEquip.url) images.push({url:imgEquip.url, alt:imgEquip.alt||''});
-  openFlipbook(titulo, buildFlipbookPages(titulo, n.code, descricao||trecho, trecho, equip, manuais, images));
+  var pages = buildFlipbookPages(titulo, n.code, descricao||trecho, trecho, equip, manuais, images);
+  return {titulo:titulo, pages:pages};
+}
+function openNormFlipbook(key){
+  var d = normFlipbookData(key); if (!d) return;
+  logFlipbook(d.titulo, 'norm', {key:key});
+  openFlipbook(d.titulo, d.pages);
+}
+function downloadNormFlipbook(key){
+  var d = normFlipbookData(key); if (!d) return;
+  downloadFlipbookHtml(d.titulo, d.pages);
 }
 
 var COURSES = [
@@ -572,6 +671,7 @@ function lessonMediaHtml(path, a){
   var vu = ed(path+'.videoUso', a.videoUso || null);
   var rows = '';
   if (media.type==='image' && media.url){ rows += '<div class="lesson-media lesson-media-img">'+editableImgTag(path+'.media', media.url, media.alt)+'</div>'; }
+  else if (media.type==='pdf' && media.pages && media.pages.length){ rows += '<div class="lesson-media-pdf"><button class="btn btn-ghost flip-btn" onclick="openPdfFlipbook(\''+path+'.media\')">'+svgIcon('book',{size:14})+' Abrir PDF como Flipbook ('+media.pages.length+' pág.)</button> <button class="btn btn-ghost flip-btn" onclick="downloadPdfFlipbook(\''+path+'.media\')">'+svgIcon('download',{size:14})+' Baixar flipbook</button>'+(STATE.edit?'<button class="edit-inline-btn" onclick="event.preventDefault();handlePdfUpload(\''+path+'.media\')">'+svgIcon('edit',{size:12})+' Trocar PDF</button>':'')+'</div>'; }
   else if (media.type==='embed' && media.url){ rows += '<div class="lesson-media lesson-media-embed"><iframe src="'+h(media.url)+'" loading="lazy" allowfullscreen frameborder="0"></iframe></div>'; if (STATE.edit) rows += '<button class="edit-inline-btn" onclick="editEmbedPrompt(\''+path+'\')">'+svgIcon('edit',{size:12})+' Editar embed</button>'; }
   else if (media.type==='video' && media.url){ rows += '<a class="media-row media-uso" href="'+h(media.url)+'" target="_blank" rel="noopener">'+svgIcon('video',{size:16})+'<span>'+h(media.alt||'Assistir vídeo')+'</span>'+svgIcon('chev',{size:13})+'</a>'; if (STATE.edit) rows += '<button class="edit-inline-btn" onclick="event.preventDefault();editMediaLinkPrompt(\''+path+'\')">'+svgIcon('edit',{size:12})+'</button>'; }
   else if (STATE.edit){ rows += '<button class="add-media-btn" onclick="addLessonMedia(\''+path+'\')">'+svgIcon('edit',{size:14})+' Adicionar imagem/vídeo desta aula</button>'; }
@@ -594,7 +694,7 @@ function lessonPanel(courseId, mi, ai){
   var showMan = primaryNormKey && (STATE.edit || (primaryNorm.manuais && primaryNorm.manuais.length));
   var equipHtml = showEquip ? ('<div class="norm-sub"><div class="norm-sub-h">'+svgIcon('wrench',{size:14})+'Equipamentos técnicos</div>'+equipBody(primaryNormKey, primaryNorm.equip)+'</div>') : '';
   var manHtml = showMan ? ('<div class="norm-sub"><div class="norm-sub-h">'+svgIcon('book',{size:14})+'Manuais e referências oficiais</div><div class="norm-man">'+manuaisBody(primaryNormKey, primaryNorm.manuais)+'</div></div>') : '';
-  var flipBtn = '<button class="btn btn-ghost flip-btn" onclick="openLessonFlipbook(\''+courseId+'\','+mi+','+ai+')">'+svgIcon('book',{size:14})+' Abrir como Flipbook</button>';
+  var flipBtn = '<button class="btn btn-ghost flip-btn" onclick="openLessonFlipbook(\''+courseId+'\','+mi+','+ai+')">'+svgIcon('book',{size:14})+' Abrir como Flipbook</button>'+' <button class="btn btn-ghost flip-btn" onclick="downloadLessonFlipbook(\''+courseId+'\','+mi+','+ai+')">'+svgIcon('download',{size:14})+' Baixar flipbook</button>';
   return '<div class="lesson-panel">'+'<div class="lesson-panel-h"><span class="chip">'+h(mod.num)+' · Módulo '+h(ed('modules.'+courseId+'.'+mi+'.titulo', mod.titulo))+'</span></div>'+'<h2 class="lesson-title">'+editableText(path+'.titulo', a.titulo)+'</h2>'+'<div class="lesson-norms">'+normChips+fonte+flipBtn+'</div>'+mediaHtml+content+trecho+equipHtml+manHtml+'</div>';
 }
 function accordionHtml(courseId, mods){
@@ -648,7 +748,7 @@ function pNormaDetail(code){
   var descHtml = (descVal || STATE.edit) ? ('<div class="detail-col detail-full"><h4>'+svgIcon('doc',{size:16})+'Descrição detalhada e como usar</h4><p class="norm-desc">'+editableBlock('norms.'+key+'.descricao', n.descricao||'')+'</p></div>') : '';
   var vuVal = normVideoUso(key);
   var vuHtml = (vuVal && vuVal.url) ? '' : (STATE.edit ? ('<button class="add-media-btn" onclick="editVideoUsoPrompt(\'norms.'+key+'\')">'+svgIcon('edit',{size:14})+' Adicionar vídeo de utilização do equipamento</button>') : '');
-  return '<section class="section"><a class="back-link" href="#/biblioteca">'+svgIcon('chev',{size:14})+' Biblioteca Técnica</a>'+'<div class="norma-detail"><span class="chip">'+h(n.orgao)+'</span><h1>'+h(n.code)+'</h1><h3>'+editableText('norms.'+key+'.titulo', n.titulo)+'</h3><span class="norm-meta">'+h(n.ed)+' · '+h(n.item)+'</span>'+fonteBtn(n)+' <button class="btn btn-ghost flip-btn" onclick="openNormFlipbook(\''+key+'\')">'+svgIcon('book',{size:14})+' Abrir como Flipbook</button>'+imgHtml+'<div class="detail-grid">'+'<div class="detail-col"><h4>'+svgIcon('doc',{size:16})+'Trecho da norma</h4>'+trechos+'</div>'+descHtml+'<div class="detail-col"><h4>'+svgIcon('wrench',{size:16})+'Equipamentos</h4>'+equipHtml+'</div>'+'<div class="detail-col"><h4>'+svgIcon('book',{size:16})+'Manuais</h4><div class="norm-man">'+manHtml+'</div></div>'+'<div class="detail-col"><h4>'+svgIcon('video',{size:16})+'Vídeos'+'</h4>'+videos+vuHtml+'</div>'+'<div class="detail-col"><h4>'+svgIcon('case',{size:16})+'Casos reais</h4>'+casos+'</div>'+'</div></div></section>';
+  return '<section class="section"><a class="back-link" href="#/biblioteca">'+svgIcon('chev',{size:14})+' Biblioteca Técnica</a>'+'<div class="norma-detail"><span class="chip">'+h(n.orgao)+'</span><h1>'+h(n.code)+'</h1><h3>'+editableText('norms.'+key+'.titulo', n.titulo)+'</h3><span class="norm-meta">'+h(n.ed)+' · '+h(n.item)+'</span>'+fonteBtn(n)+' <button class="btn btn-ghost flip-btn" onclick="openNormFlipbook(\''+key+'\')">'+svgIcon('book',{size:14})+' Abrir como Flipbook</button>'+' <button class="btn btn-ghost flip-btn" onclick="downloadNormFlipbook(\''+key+'\')">'+svgIcon('download',{size:14})+' Baixar flipbook</button>'+imgHtml+'<div class="detail-grid">'+'<div class="detail-col"><h4>'+svgIcon('doc',{size:16})+'Trecho da norma</h4>'+trechos+'</div>'+descHtml+'<div class="detail-col"><h4>'+svgIcon('wrench',{size:16})+'Equipamentos</h4>'+equipHtml+'</div>'+'<div class="detail-col"><h4>'+svgIcon('book',{size:16})+'Manuais</h4><div class="norm-man">'+manHtml+'</div></div>'+'<div class="detail-col"><h4>'+svgIcon('video',{size:16})+'Vídeos'+'</h4>'+videos+vuHtml+'</div>'+'<div class="detail-col"><h4>'+svgIcon('case',{size:16})+'Casos reais</h4>'+casos+'</div>'+'</div></div></section>';
 }
 
 function videoCard(v, idx){
@@ -660,7 +760,7 @@ function pVideos(){ return '<section class="section"><h2>Vídeos Técnicos</h2><
 
 function pAdmin(){
   var jsonStr = JSON.stringify(EDITS, null, 2);
-  return '<section class="section"><h2>Painel do Instrutor</h2><div class="admin-grid">'+'<div class="admin-card"><strong>'+COURSES.length+'</strong><span>cursos cadastrados</span></div>'+'<div class="admin-card"><strong>'+Object.keys(NORMS).length+'</strong><span>normas rastreadas</span></div>'+'<div class="admin-card"><strong>'+LIB.length+'</strong><span>entradas na biblioteca técnica</span></div>'+'<div class="admin-card"><strong>'+VIDEOS.length+'</strong><span>vídeos catalogados</span></div>'+'</div>'+'<div class="modulo-block" style="margin-top:28px"><h3 style="margin-bottom:6px">Modo de Edição</h3>'+'<p class="muted">Clique no ícone de lápis no topo da página para ativar o modo de edição. Com ele ativo, clique em qualquer texto para editá-lo, clique em uma imagem para trocar a URL, e use os botões pontilhados para adicionar mídia onde não houver. As alterações ficam salvas neste navegador.</p>'+'<h3 style="margin:18px 0 6px">Editor Avançado (JSON)</h3>'+'<p class="muted">Edita diretamente todas as sobreposições de conteúdo — útil para colar textos extraídos de outro lugar em qualquer campo do site, ou para backup/restauração.</p>'+'<textarea id="edits-json" class="json-editor" spellcheck="false">'+h(jsonStr)+'</textarea>'+'<div class="admin-actions">'+'<button class="btn btn-primary" onclick="saveJsonEditor()">Salvar JSON</button>'+'<button class="btn btn-ghost" onclick="exportEdits()">Exportar backup</button>'+'<button class="btn btn-ghost" onclick="document.getElementById(\'import-file\').click()">Importar backup</button>'+'<input type="file" id="import-file" accept="application/json" style="display:none" onchange="importEdits(event)">'+'<button class="btn btn-ghost" onclick="resetEdits()">Restaurar conteúdo original</button>'+'</div></div></section>';
+  return '<section class="section"><h2>Painel do Instrutor</h2><div class="admin-grid">'+'<div class="admin-card"><strong>'+COURSES.length+'</strong><span>cursos cadastrados</span></div>'+'<div class="admin-card"><strong>'+Object.keys(NORMS).length+'</strong><span>normas rastreadas</span></div>'+'<div class="admin-card"><strong>'+LIB.length+'</strong><span>entradas na biblioteca técnica</span></div>'+'<div class="admin-card"><strong>'+VIDEOS.length+'</strong><span>vídeos catalogados</span></div>'+'</div>'+'<div class="modulo-block" style="margin-top:28px"><h3 style="margin-bottom:6px">Modo de Edição</h3>'+'<p class="muted">Clique no ícone de lápis no topo da página para ativar o modo de edição. Com ele ativo, clique em qualquer texto para editá-lo, clique em uma imagem para trocar a URL, e use os botões pontilhados para adicionar mídia onde não houver. As alterações ficam salvas neste navegador.</p>'+'<h3 style="margin:18px 0 6px">Editor Avançado (JSON)</h3>'+'<p class="muted">Edita diretamente todas as sobreposições de conteúdo — útil para colar textos extraídos de outro lugar em qualquer campo do site, ou para backup/restauração.</p>'+'<textarea id="edits-json" class="json-editor" spellcheck="false">'+h(jsonStr)+'</textarea>'+'<div class="admin-actions">'+'<button class="btn btn-primary" onclick="saveJsonEditor()">Salvar JSON</button>'+'<button class="btn btn-ghost" onclick="exportEdits()">Exportar backup</button>'+'<button class="btn btn-ghost" onclick="document.getElementById(\'import-file\').click()">Importar backup</button>'+'<input type="file" id="import-file" accept="application/json" style="display:none" onchange="importEdits(event)">'+'<button class="btn btn-ghost" onclick="resetEdits()">Restaurar conteúdo original</button>'+'</div></div>'+'<div class="modulo-block" style="margin-top:18px"><h3 style="margin-bottom:6px">Meus Flipbooks</h3><p class="muted">Flipbooks (aulas, normas ou PDFs) que você abriu — baixe novamente quando quiser.</p>'+flipbookLogHtml()+'</div></section>';
 }
 
 function foot(){ return '<footer class="foot"><span>© 2026 RelyOn Academy — ferramenta de desenvolvimento de instrutores.</span></footer>'; }
