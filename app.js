@@ -199,6 +199,17 @@ function editImagePrompt(path){
   var merged = {}; for (var k in cur){ merged[k]=cur[k]; } merged.url=url; merged.alt = (alt==null)?(cur.alt||''):alt;
   setEditPath(path, merged); render();
 }
+function addAttachment(path){
+  var choice = window.prompt('O que deseja anexar a esta aula?\n\n1 = Imagem, vídeo ou PDF principal da aula\n2 = Vídeo de utilização do equipamento\n3 = Vídeo (lista de vídeos)\n4 = Reportagem/link\n5 = Slides (PDF, imagem ou link)', '1');
+  if (!choice) return;
+  choice = choice.trim();
+  if (choice==='1'){ addLessonMedia(path); return; }
+  if (choice==='2'){ editVideoUsoPrompt(path); return; }
+  if (choice==='3'){ addListItem(path+'.videos'); return; }
+  if (choice==='4'){ addListItem(path+'.links'); return; }
+  if (choice==='5'){ addSlideItem(path+'.slides'); return; }
+  toast('Opção inválida.');
+}
 function addLessonMedia(path){
   var t = window.prompt('Tipo de mídia — digite "imagem", "video", "embed" ou "pdf" (o PDF vira um flipbook automaticamente):', 'imagem');
   if (!t) return;
@@ -373,7 +384,8 @@ function downloadSlideFlipbook(path, idx){
   if (!pages) return;
   downloadFlipbookHtml(item.titulo||'Slides', pages);
 }
-function slidesSectionHtml(path){
+function slidesSectionHtml(path, showAdd){
+  if (showAdd===undefined) showAdd = true;
   var arr = ed(path, []) || [];
   var rows = arr.map(function(it, idx){
     var isFile = it.type==='pdf' || it.type==='image';
@@ -386,7 +398,7 @@ function slidesSectionHtml(path){
     var editBtn = STATE.edit ? ('<button class="edit-inline-btn" onclick="event.preventDefault();editListItem(\''+path+'\','+idx+')">'+svgIcon('edit',{size:12})+'</button>') : '';
     return '<a class="media-row" href="'+h(it.url)+'" target="_blank" rel="noopener">'+svgIcon('doc',{size:16})+'<span>'+h(it.titulo||it.url)+'</span>'+svgIcon('chev',{size:13})+'</a>'+editBtn+removeBtn;
   }).join('');
-  var addBtn = STATE.edit ? ('<button class="add-media-btn" onclick="addSlideItem(\''+path+'\')">'+svgIcon('edit',{size:14})+' Adicionar slides</button>') : '';
+  var addBtn = (showAdd && STATE.edit) ? ('<button class="add-media-btn" onclick="addSlideItem(\''+path+'\')">'+svgIcon('edit',{size:14})+' Adicionar slides</button>') : '';
   return rows + addBtn;
 }
 function listItemLabels(path){
@@ -429,12 +441,13 @@ function removeListItem(path, idx){
   setEditPath(path, arr);
   render();
 }
-function listSectionHtml(path, icon, addLabel){
+function listSectionHtml(path, icon, addLabel, showAdd){
+  if (showAdd===undefined) showAdd = true;
   var arr = ed(path, []) || [];
   var rows = arr.map(function(it, idx){
     return '<a class="media-row" href="'+h(it.url)+'" target="_blank" rel="noopener">'+svgIcon(icon,{size:16})+'<span>'+h(it.titulo||it.url)+'</span>'+svgIcon('chev',{size:13})+'</a>'+(STATE.edit?('<button class="edit-inline-btn" onclick="event.preventDefault();editListItem(\''+path+'\','+idx+')">'+svgIcon('edit',{size:12})+'</button><button class="edit-inline-btn" onclick="event.preventDefault();removeListItem(\''+path+'\','+idx+')">'+svgIcon('close',{size:12})+'</button>'):'');
   }).join('');
-  var addBtn = STATE.edit ? ('<button class="add-media-btn" onclick="addListItem(\''+path+'\')">'+svgIcon('edit',{size:14})+' '+addLabel+'</button>') : '';
+  var addBtn = (showAdd && STATE.edit) ? ('<button class="add-media-btn" onclick="addListItem(\''+path+'\')">'+svgIcon('edit',{size:14})+' '+addLabel+'</button>') : '';
   return rows + addBtn;
 }
 function bgEditBtn(path){ if (!STATE.edit) return ''; return '<button class="bg-edit-btn" onclick="event.stopPropagation();event.preventDefault();editImagePrompt(\''+path+'\')">'+svgIcon('edit',{size:13})+' Imagem</button>'; }
@@ -940,13 +953,12 @@ function lessonMediaHtml(path, a){
   else if (media.type==='pdf' && media.pages && media.pages.length){ rows += '<div class="lesson-media-pdf"><button class="btn btn-ghost flip-btn" onclick="openPdfFlipbook(\''+path+'.media\')">'+svgIcon('book',{size:14})+' Abrir PDF como Flipbook ('+media.pages.length+' pág.)</button> <button class="btn btn-ghost flip-btn" onclick="downloadPdfFlipbook(\''+path+'.media\')">'+svgIcon('download',{size:14})+' Baixar flipbook</button>'+(STATE.edit?'<button class="edit-inline-btn" onclick="event.preventDefault();handlePdfUpload(\''+path+'.media\')">'+svgIcon('edit',{size:12})+' Trocar PDF</button>':'')+'</div>'; }
   else if (media.type==='embed' && media.url){ rows += '<div class="lesson-media lesson-media-embed"><iframe src="'+h(media.url)+'" loading="lazy" allowfullscreen frameborder="0"></iframe></div>'; if (STATE.edit) rows += '<button class="edit-inline-btn" onclick="editEmbedPrompt(\''+path+'\')">'+svgIcon('edit',{size:12})+' Editar embed</button>'; }
   else if (media.type==='video' && media.url){ rows += '<a class="media-row media-uso" href="'+h(media.url)+'" target="_blank" rel="noopener">'+svgIcon('video',{size:16})+'<span>'+h(media.alt||'Assistir vídeo')+'</span>'+svgIcon('chev',{size:13})+'</a>'; if (STATE.edit) rows += '<button class="edit-inline-btn" onclick="event.preventDefault();editMediaLinkPrompt(\''+path+'\')">'+svgIcon('edit',{size:12})+'</button>'; }
-  else if (STATE.edit){ rows += '<button class="add-media-btn" onclick="addLessonMedia(\''+path+'\')">'+svgIcon('edit',{size:14})+' Adicionar imagem/vídeo desta aula</button>'; }
   if (vu && vu.url){ rows += '<a class="media-row media-uso" href="'+h(vu.url)+'" target="_blank" rel="noopener">'+svgIcon('video',{size:16})+'<span><strong>Vídeo de utilização do equipamento</strong><br>'+h(vu.titulo)+'</span>'+svgIcon('chev',{size:13})+'</a>'+(STATE.edit ? '<button class="edit-inline-btn" onclick="event.preventDefault();editVideoUsoPrompt(\''+path+'\')">'+svgIcon('edit',{size:12})+'</button>' : ''); }
-  else if (STATE.edit){ rows += '<button class="add-media-btn" onclick="editVideoUsoPrompt(\''+path+'\')">'+svgIcon('edit',{size:14})+' Adicionar vídeo de utilização do equipamento</button>'; }
   var videosArr = ed(path+'.videos', []); var linksArr = ed(path+'.links', []); var slidesArr = ed(path+'.slides', []);
-  if (STATE.edit || videosArr.length){ rows += '<div class="lesson-list-group"><div class="lesson-list-h">'+svgIcon('video',{size:14})+'Vídeos</div>'+listSectionHtml(path+'.videos','video','Adicionar vídeo')+'</div>'; }
-  if (STATE.edit || linksArr.length){ rows += '<div class="lesson-list-group"><div class="lesson-list-h">'+svgIcon('news',{size:14})+'Reportagens e links</div>'+listSectionHtml(path+'.links','news','Adicionar reportagem/link')+'</div>'; }
-  if (STATE.edit || slidesArr.length){ rows += '<div class="lesson-list-group"><div class="lesson-list-h">'+svgIcon('doc',{size:14})+'Slides</div>'+slidesSectionHtml(path+'.slides')+'</div>'; }
+  if (videosArr.length){ rows += '<div class="lesson-list-group"><div class="lesson-list-h">'+svgIcon('video',{size:14})+'Vídeos</div>'+listSectionHtml(path+'.videos','video','Adicionar vídeo', false)+'</div>'; }
+  if (linksArr.length){ rows += '<div class="lesson-list-group"><div class="lesson-list-h">'+svgIcon('news',{size:14})+'Reportagens e links</div>'+listSectionHtml(path+'.links','news','Adicionar reportagem/link', false)+'</div>'; }
+  if (slidesArr.length){ rows += '<div class="lesson-list-group"><div class="lesson-list-h">'+svgIcon('doc',{size:14})+'Slides</div>'+slidesSectionHtml(path+'.slides', false)+'</div>'; }
+  if (STATE.edit) rows += '<button class="add-media-btn btn-block" onclick="addAttachment(\''+path+'\')">'+svgIcon('edit',{size:14})+' Anexar imagem, PDF, vídeo, link ou slides</button>';
   return rows;
 }
 function lessonPanel(courseId, mi, ai){
