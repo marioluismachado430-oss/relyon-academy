@@ -280,6 +280,7 @@ function redownloadFlipbook(idx){
   if (it.kind==='lesson'){ downloadLessonFlipbook(it.ref.courseId, it.ref.mi, it.ref.ai); }
   else if (it.kind==='norm'){ downloadNormFlipbook(it.ref.key); }
   else if (it.kind==='pdf'){ downloadPdfFlipbook(it.ref.path); }
+  else if (it.kind==='slide'){ downloadSlideFlipbook(it.ref.path, it.ref.idx); }
 }
 function flipbookLogHtml(){
   var arr = fpLog();
@@ -293,6 +294,101 @@ function flipbookLogHtml(){
 function editMediaLinkPrompt(path){ var cur = ed(path+'.media', {type:'video', url:'', alt:'Assistir vídeo'}); var url = window.prompt('URL do vídeo:', cur.url||''); if (url===null) return; var norm = normalizeUrl(url); if (!looksLikeUrl(norm)){ window.alert('O link informado não parece válido. Cole a URL completa (ex: https://youtube.com/watch?v=XXXX).'); return; } var alt = window.prompt('Rótulo exibido no link:', cur.alt||'Assistir vídeo'); setEditPath(path+'.media', {type:'video', url:norm, alt:alt||'Assistir vídeo'}); render(); }
 function editEmbedPrompt(path){ var cur = ed(path+'.media', {url:''}); var url = window.prompt('URL do embed:', cur.url||''); if (url===null) return; var norm = normalizeUrl(url); if (!looksLikeUrl(norm)){ window.alert('O link informado não parece válido.'); return; } setEditPath(path+'.media', {type:'embed', url:norm}); render(); }
 function editVideoUsoPrompt(path){ var cur = ed(path+'.videoUso', {titulo:'', url:''}); var url = window.prompt('URL do vídeo de utilização:', cur.url||''); if (url===null) return; var norm = normalizeUrl(url); if (!looksLikeUrl(norm)){ window.alert('O link informado não parece válido. Cole a URL completa (ex: https://youtube.com/watch?v=XXXX).'); return; } var titulo = window.prompt('Título do vídeo:', cur.titulo||''); setEditPath(path+'.videoUso', {titulo: titulo||'', url:norm}); render(); }
+function getSlideUploadInput(){ return document.getElementById('slide-upload-input'); }
+function addSlideItem(path){
+  var fromDevice = window.confirm('Adicionar slides:\n\nOK = enviar arquivo do computador/celular (PDF ou imagem, vira flipbook automaticamente)\nCancelar = colar um link (Google Slides, PPT publicado, etc.)');
+  if (fromDevice){ uploadSlideFile(path); return; }
+  addListItem(path);
+}
+function uploadSlideFile(path){
+  var input = getSlideUploadInput();
+  if (!input){ toast('Upload de arquivo indisponível neste navegador.'); return; }
+  input.onchange = function(e){
+    var file = e.target.files && e.target.files[0];
+    input.value = '';
+    if (!file) return;
+    var isPdf = file.type==='application/pdf' || /\.pdf$/i.test(file.name);
+    var isImg = /^image\//.test(file.type);
+    if (!isPdf && !isImg){ toast('Selecione um arquivo PDF ou uma imagem.'); return; }
+    var arr = (ed(path, [])||[]).slice();
+    if (isPdf){
+      if (!window.pdfjsLib){ toast('Biblioteca de PDF não carregou — verifique sua conexão.'); return; }
+      toast('Convertendo PDF em páginas…');
+      var reader = new FileReader();
+      reader.onload = function(){
+        var typedarray = new Uint8Array(reader.result);
+        pdfjsLib.getDocument({data: typedarray}).promise.then(function(pdf){
+          var pages = []; var n = pdf.numPages;
+          function renderPage(i){
+            return pdf.getPage(i).then(function(page){
+              var viewport = page.getViewport({scale: 1.4});
+              var canvas = document.createElement('canvas');
+              canvas.width = viewport.width; canvas.height = viewport.height;
+              var ctx = canvas.getContext('2d');
+              return page.render({canvasContext: ctx, viewport: viewport}).promise.then(function(){
+                pages.push(canvas.toDataURL('image/jpeg', 0.82));
+              });
+            });
+          }
+          var chain = Promise.resolve();
+          for (var i=1;i<=n;i++){ (function(i2){ chain = chain.then(function(){ return renderPage(i2); }); })(i); }
+          chain.then(function(){
+            arr.push({titulo: file.name, type:'pdf', pages: pages});
+            setEditPath(path, arr);
+            render();
+            toast('Slides adicionados: '+pages.length+' página(s).');
+          }).catch(function(){ toast('Erro ao converter o PDF.'); });
+        }).catch(function(){ toast('Não foi possível abrir o PDF.'); });
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      var reader2 = new FileReader();
+      reader2.onload = function(){
+        arr.push({titulo: file.name, type:'image', url: reader2.result});
+        setEditPath(path, arr);
+        render();
+        toast('Slide adicionado.');
+      };
+      reader2.onerror = function(){ toast('Não foi possível ler o arquivo.'); };
+      reader2.readAsDataURL(file);
+    }
+  };
+  input.click();
+}
+function slideFlipbookPages(item){
+  if (item.type==='pdf' && item.pages && item.pages.length) return item.pages.map(function(p){ return '<div class="fp-page fp-page-full-img"><img src="'+p+'" alt="Slide"></div>'; });
+  if (item.type==='image' && item.url) return ['<div class="fp-page fp-page-full-img"><img src="'+item.url+'" alt="Slide"></div>'];
+  return null;
+}
+function openSlideFlipbook(path, idx){
+  var arr = ed(path, [])||[]; var item = arr[idx]; if (!item) return;
+  var pages = slideFlipbookPages(item);
+  if (!pages){ toast('Este item não é um arquivo de slides.'); return; }
+  logFlipbook(item.titulo||'Slides', 'slide', {path:path, idx:idx});
+  openFlipbook(item.titulo||'Slides', pages);
+}
+function downloadSlideFlipbook(path, idx){
+  var arr = ed(path, [])||[]; var item = arr[idx]; if (!item) return;
+  var pages = slideFlipbookPages(item);
+  if (!pages) return;
+  downloadFlipbookHtml(item.titulo||'Slides', pages);
+}
+function slidesSectionHtml(path){
+  var arr = ed(path, []) || [];
+  var rows = arr.map(function(it, idx){
+    var isFile = it.type==='pdf' || it.type==='image';
+    var removeBtn = STATE.edit ? ('<button class="edit-inline-btn" onclick="event.preventDefault();removeListItem(\''+path+'\','+idx+')">'+svgIcon('close',{size:12})+'</button>') : '';
+    if (isFile){
+      var countLbl = it.type==='pdf' ? (' ('+(it.pages?it.pages.length:0)+' pág.)') : '';
+      return '<div class="media-row"><button class="link-like" onclick="openSlideFlipbook(\''+path+'\','+idx+')">'+svgIcon('doc',{size:16})+'<span>'+h(it.titulo||'Slides')+countLbl+'</span></button>'+
+        '<button class="edit-inline-btn" onclick="downloadSlideFlipbook(\''+path+'\','+idx+')" title="Baixar flipbook">'+svgIcon('download',{size:12})+'</button>'+removeBtn+'</div>';
+    }
+    var editBtn = STATE.edit ? ('<button class="edit-inline-btn" onclick="event.preventDefault();editListItem(\''+path+'\','+idx+')">'+svgIcon('edit',{size:12})+'</button>') : '';
+    return '<a class="media-row" href="'+h(it.url)+'" target="_blank" rel="noopener">'+svgIcon('doc',{size:16})+'<span>'+h(it.titulo||it.url)+'</span>'+svgIcon('chev',{size:13})+'</a>'+editBtn+removeBtn;
+  }).join('');
+  var addBtn = STATE.edit ? ('<button class="add-media-btn" onclick="addSlideItem(\''+path+'\')">'+svgIcon('edit',{size:14})+' Adicionar slides</button>') : '';
+  return rows + addBtn;
+}
 function listItemLabels(path){
   if (/\.videos$/.test(path)) return {t:'Título do vídeo:', u:'URL do vídeo (YouTube, etc.):'};
   if (/\.links$/.test(path)) return {t:'Título da reportagem/link:', u:'URL da reportagem/link:'};
@@ -419,7 +515,7 @@ function buildFlipbookPages(titulo, subtitulo, content, trecho, equip, manuais, 
   if (extras){
     if (extras.videos && extras.videos.length) chunkList(extras.videos, 8).forEach(function(group){ pages.push('<div class="fp-page"><h3>Vídeos</h3><ul>'+group.map(function(v){ return '<li><a href="'+h(v.url)+'" target="_blank" rel="noopener">'+h(v.titulo||v.url)+'</a></li>'; }).join('')+'</ul></div>'); });
     if (extras.links && extras.links.length) chunkList(extras.links, 8).forEach(function(group){ pages.push('<div class="fp-page"><h3>Reportagens e links</h3><ul>'+group.map(function(l){ return '<li><a href="'+h(l.url)+'" target="_blank" rel="noopener">'+h(l.titulo||l.url)+'</a></li>'; }).join('')+'</ul></div>'); });
-    if (extras.slides && extras.slides.length) chunkList(extras.slides, 8).forEach(function(group){ pages.push('<div class="fp-page"><h3>Slides</h3><ul>'+group.map(function(s){ return '<li><a href="'+h(s.url)+'" target="_blank" rel="noopener">'+h(s.titulo||s.url)+'</a></li>'; }).join('')+'</ul></div>'); });
+    if (extras.slides && extras.slides.length) chunkList(extras.slides, 8).forEach(function(group){ pages.push('<div class="fp-page"><h3>Slides</h3><ul>'+group.map(function(s){ return s.url ? ('<li><a href="'+h(s.url)+'" target="_blank" rel="noopener">'+h(s.titulo||s.url)+'</a></li>') : ('<li>'+h(s.titulo||'Slides')+(s.pages?' ('+s.pages.length+' pág.)':'')+'</li>'); }).join('')+'</ul></div>'); });
   }
   pages.push('<div class="fp-page fp-cover"><p class="muted">Fim</p></div>');
   return pages;
@@ -850,7 +946,7 @@ function lessonMediaHtml(path, a){
   var videosArr = ed(path+'.videos', []); var linksArr = ed(path+'.links', []); var slidesArr = ed(path+'.slides', []);
   if (STATE.edit || videosArr.length){ rows += '<div class="lesson-list-group"><div class="lesson-list-h">'+svgIcon('video',{size:14})+'Vídeos</div>'+listSectionHtml(path+'.videos','video','Adicionar vídeo')+'</div>'; }
   if (STATE.edit || linksArr.length){ rows += '<div class="lesson-list-group"><div class="lesson-list-h">'+svgIcon('news',{size:14})+'Reportagens e links</div>'+listSectionHtml(path+'.links','news','Adicionar reportagem/link')+'</div>'; }
-  if (STATE.edit || slidesArr.length){ rows += '<div class="lesson-list-group"><div class="lesson-list-h">'+svgIcon('doc',{size:14})+'Slides</div>'+listSectionHtml(path+'.slides','doc','Adicionar slides')+'</div>'; }
+  if (STATE.edit || slidesArr.length){ rows += '<div class="lesson-list-group"><div class="lesson-list-h">'+svgIcon('doc',{size:14})+'Slides</div>'+slidesSectionHtml(path+'.slides')+'</div>'; }
   return rows;
 }
 function lessonPanel(courseId, mi, ai){
