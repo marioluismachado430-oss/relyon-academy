@@ -896,6 +896,41 @@ function pBiblioteca(){
   var empty = !cards ? '<p class="muted">Nenhuma legislação cadastrada nesta categoria ainda.</p>' : '';
   return '<section class="section"><h2>Biblioteca Técnica</h2><p class="muted">Normas, equipamentos, manuais de fabricantes, vídeos e casos reais organizados por tema — preferência por legislações em português ou traduzidas. Base de consulta para instrutores.</p>'+'<div class="filt-bar">'+tabs+'</div>'+'<div class="lib-grid">'+cards+'</div>'+empty+'</section>';
 }
+function downloadNormExcerpt(key){
+  var n = NORMS[key]; if (!n) return;
+  var titulo = ed('norms.'+key+'.titulo', n.titulo);
+  var trecho = ed('norms.'+key+'.trecho', n.trecho||'');
+  var descricao = ed('norms.'+key+'.descricao', n.descricao||'');
+  var equip = ed('norms.'+key+'.equip', n.equip)||[];
+  var manuais = ed('norms.'+key+'.manuais', n.manuais)||[];
+  var lib = findLib(n.code);
+  var trechosLib = (lib && lib.trechos) || [];
+  var html = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'+
+    '<title>'+h(n.code)+' — '+h(titulo)+'</title>'+
+    '<style>body{font-family:Georgia,\'Times New Roman\',serif;max-width:720px;margin:40px auto;padding:0 24px;color:#1a1a1a;line-height:1.6}'+
+    'h1{font-size:22px;margin-bottom:2px}h2{font-size:13px;color:#666;font-weight:normal;margin-top:0}'+
+    'h3{font-size:15px;margin-top:28px;border-bottom:2px solid #a3620f;padding-bottom:4px;color:#a3620f}'+
+    'blockquote{border-left:3px solid #a3620f;margin:0 0 12px;padding-left:14px;font-style:italic;color:#333}'+
+    'ul{padding-left:20px}li{margin-bottom:6px}'+
+    '.meta{font-size:12px;color:#888;margin-bottom:18px}'+
+    '.fonte{font-size:12px;margin-top:30px;padding-top:14px;border-top:1px solid #ddd;color:#666}'+
+    '@media print{body{margin:0;padding:20px}}</style></head><body>'+
+    '<h1>'+h(n.code)+'</h1><h2>'+h(titulo)+'</h2>'+
+    '<div class="meta">'+h(n.orgao)+' · '+h(n.ed)+' · '+h(n.item)+'</div>'+
+    (trecho ? '<h3>Trecho da norma</h3><blockquote>'+h(trecho)+'</blockquote>' : '')+
+    (trechosLib.length ? trechosLib.map(function(t){ return '<blockquote>'+h(t)+'</blockquote>'; }).join('') : '')+
+    (descricao ? '<h3>Descrição e como usar</h3><p>'+richHtml(descricao)+'</p>' : '')+
+    (equip.length ? '<h3>Equipamentos</h3><ul>'+equip.map(function(e){ return '<li>'+h(e)+'</li>'; }).join('')+'</ul>' : '')+
+    (manuais.length ? '<h3>Manuais e referências</h3><ul>'+manuais.map(function(m){ return '<li>'+h(m.nome)+(m.url?' — <a href="'+h(m.url)+'">'+h(m.url)+'</a>':'')+'</li>'; }).join('')+'</ul>' : '')+
+    '<div class="fonte">Resumo gerado pela RelyOn Academy a partir de '+h(n.orgao)+' — '+h(n.code)+'. '+(n.link && n.link!=='interno' ? 'Fonte oficial completa: <a href="'+h(n.link)+'">'+h(n.link)+'</a>' : 'Documento interno.')+'</div>'+
+    '</body></html>';
+  var blob = new Blob([html], {type:'text/html'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = (n.code||'norma').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'')+'-trecho.html';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+}
 function pNormaDetail(code){
   var n = null, key = null;
   Object.keys(NORMS).forEach(function(k){ if (NORMS[k].code===code) { n = NORMS[k]; key = k; } });
@@ -916,7 +951,7 @@ function pNormaDetail(code){
   var descHtml = (descVal || STATE.edit) ? ('<div class="detail-col detail-full"><h4>'+svgIcon('doc',{size:16})+'Descrição detalhada e como usar</h4><p class="norm-desc">'+editableBlock('norms.'+key+'.descricao', n.descricao||'')+'</p></div>') : '';
   var vuVal = normVideoUso(key);
   var vuHtml = (vuVal && vuVal.url) ? '' : (STATE.edit ? ('<button class="add-media-btn" onclick="editVideoUsoPrompt(\'norms.'+key+'\')">'+svgIcon('edit',{size:14})+' Adicionar vídeo de utilização do equipamento</button>') : '');
-  return '<section class="section"><a class="back-link" href="#/biblioteca">'+svgIcon('chev',{size:14})+' Biblioteca Técnica</a>'+'<div class="norma-detail"><span class="chip">'+h(n.orgao)+'</span><h1>'+h(n.code)+'</h1><h3>'+editableText('norms.'+key+'.titulo', n.titulo)+'</h3><span class="norm-meta">'+h(n.ed)+' · '+h(n.item)+'</span>'+fonteBtn(n)+' <button class="btn btn-ghost flip-btn" onclick="openNormFlipbook(\''+key+'\')">'+svgIcon('book',{size:14})+' Abrir como Flipbook</button>'+' <button class="btn btn-ghost flip-btn" onclick="downloadNormFlipbook(\''+key+'\')">'+svgIcon('download',{size:14})+' Baixar flipbook</button>'+imgHtml+'<div class="detail-grid">'+'<div class="detail-col"><h4>'+svgIcon('doc',{size:16})+'Trecho da norma</h4>'+trechos+'</div>'+descHtml+'<div class="detail-col"><h4>'+svgIcon('wrench',{size:16})+'Equipamentos</h4>'+equipHtml+'</div>'+'<div class="detail-col"><h4>'+svgIcon('book',{size:16})+'Manuais</h4><div class="norm-man">'+manHtml+'</div></div>'+'<div class="detail-col"><h4>'+svgIcon('video',{size:16})+'Vídeos'+'</h4>'+videos+vuHtml+'</div>'+'<div class="detail-col"><h4>'+svgIcon('case',{size:16})+'Casos reais</h4>'+casos+'</div>'+'</div></div></section>';
+  return '<section class="section"><a class="back-link" href="#/biblioteca">'+svgIcon('chev',{size:14})+' Biblioteca Técnica</a>'+'<div class="norma-detail"><span class="chip">'+h(n.orgao)+'</span><h1>'+h(n.code)+'</h1><h3>'+editableText('norms.'+key+'.titulo', n.titulo)+'</h3><span class="norm-meta">'+h(n.ed)+' · '+h(n.item)+'</span>'+fonteBtn(n)+' <button class="btn btn-ghost flip-btn" onclick="openNormFlipbook(\''+key+'\')">'+svgIcon('book',{size:14})+' Abrir como Flipbook</button>'+' <button class="btn btn-ghost flip-btn" onclick="downloadNormFlipbook(\''+key+'\')">'+svgIcon('download',{size:14})+' Baixar flipbook</button>'+' <button class="btn btn-ghost flip-btn" onclick="downloadNormExcerpt(\''+key+'\')">'+svgIcon('doc',{size:14})+' Baixar trecho (imprimir/PDF)</button>'+imgHtml+'<div class="detail-grid">'+'<div class="detail-col"><h4>'+svgIcon('doc',{size:16})+'Trecho da norma</h4>'+trechos+'</div>'+descHtml+'<div class="detail-col"><h4>'+svgIcon('wrench',{size:16})+'Equipamentos</h4>'+equipHtml+'</div>'+'<div class="detail-col"><h4>'+svgIcon('book',{size:16})+'Manuais</h4><div class="norm-man">'+manHtml+'</div></div>'+'<div class="detail-col"><h4>'+svgIcon('video',{size:16})+'Vídeos'+'</h4>'+videos+vuHtml+'</div>'+'<div class="detail-col"><h4>'+svgIcon('case',{size:16})+'Casos reais</h4>'+casos+'</div>'+'</div></div></section>';
 }
 
 function videoCard(v, idx){
