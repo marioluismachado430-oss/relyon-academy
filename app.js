@@ -503,7 +503,12 @@ function buildFlipbookPages(titulo, subtitulo, content, trecho, equip, manuais, 
   pages.push('<div class="fp-page fp-cover"'+(coverImg?' style="background-image:linear-gradient(0deg,rgba(0,0,0,.55),rgba(0,0,0,.25)),url(\''+coverImg.url.replace(/'/g,"%27")+'\')"':'')+'><h2>'+h(subtitulo||'')+'</h2><h1>'+h(titulo||'')+'</h1></div>');
   var extraImages = (images||[]).slice(1);
   var imgIdx = 0;
-  splitContentPages(content||'', 620).forEach(function(chunk, i){
+  var corpo = splitContentPages(content||'', 1e9).join('<br><br>');
+  if (window.FPL && corpo){
+    var imgHtml = '';
+    if (extraImages.length){ var im0 = extraImages[imgIdx++]; imgHtml = '<div class="fp-img-wrap"><img src="'+h(im0.url)+'" alt="'+h(im0.alt||'')+'"></div>'; }
+    pages.push('<div class="fp-page'+(imgHtml?' fp-page-img':'')+'">'+imgHtml+'<div class="fp-text">'+corpo+'</div></div>');
+  } else splitContentPages(content||'', 620).forEach(function(chunk, i){
     var imgHtml = '';
     if (imgIdx < extraImages.length && (i%2===1)){
       var im = extraImages[imgIdx++];
@@ -517,7 +522,7 @@ function buildFlipbookPages(titulo, subtitulo, content, trecho, equip, manuais, 
   }
   function chunkList(arr, size){ var out=[]; for (var i=0;i<arr.length;i+=size) out.push(arr.slice(i,i+size)); return out; }
   if (trecho){
-    splitContentPages(trecho, 560).forEach(function(chunk){ pages.push('<div class="fp-page fp-cover"><h3>Trecho normativo</h3><blockquote>'+chunk+'</blockquote></div>'); });
+    (window.FPL ? [splitContentPages(trecho, 1e9).join('<br><br>')] : splitContentPages(trecho, 560)).forEach(function(chunk){ pages.push('<div class="fp-page fp-cover"><h3>Trecho normativo</h3><blockquote>'+chunk+'</blockquote></div>'); });
   }
   if (equip && equip.length){
     chunkList(equip, 6).forEach(function(group){ pages.push('<div class="fp-page"><h3>Equipamentos</h3><ul>'+group.map(function(e){ return '<li>'+h(e)+'</li>'; }).join('')+'</ul></div>'); });
@@ -547,16 +552,16 @@ function downloadFlipbookHtml(titulo, pagesHtml){
     '.fp-cover{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:linear-gradient(160deg,#2b2016,#1a140d);color:#f0e6d2}.fp-cover h1{color:#f0e6d2;max-width:100%;overflow-wrap:break-word}.fp-cover h2{color:#c9a86a;max-width:100%;overflow-wrap:break-word}'+
     '.fp-img-wrap{margin:-34px -30px 14px;overflow:hidden;background:#2b2016}.fp-img-wrap img{width:100%;max-height:28vh;object-fit:contain;display:block;background:#2b2016}'+
     '.fp-page-full-img{padding:0;overflow:hidden}.fp-page-full-img img{width:100%;height:100%;object-fit:contain;display:block;background:#2b2016}'+
-    'body{display:flex;justify-content:center;align-items:center;padding:20px;background:#0B0F17;box-sizing:border-box;min-height:100vh}#fp-book{max-width:100%;max-height:100%;filter:drop-shadow(0 18px 40px rgba(0,0,0,.5))}'+
+    'body{display:flex;justify-content:center;align-items:center;padding:20px 10px;background:#0B0F17;box-sizing:border-box;min-height:100vh;overflow:hidden}#fp-book{max-width:100%;filter:drop-shadow(0 18px 40px rgba(0,0,0,.5))}'+
     '@media(max-width:560px){body{padding:10px}.fp-page{padding:22px 16px 18px;font-size:12.5px}.fp-page h1{font-size:17px}.fp-page h3{font-size:13px}.fp-text{font-size:12.5px;line-height:1.65}.fp-img-wrap{margin:-22px -16px 10px}.fp-img-wrap img{max-height:20vh}}'+
     '</style>'+
     '<script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"><\/script>'+
-    '</head><body><div id="fp-book">'+pagesHtml.join('')+'</div>'+
-    '<script>'+
-    'function fpSize(){var vw=window.innerWidth||800,vh=window.innerHeight||600;var aw=Math.max(240,vw-(vw<560?24:40));var ah=Math.max(300,vh-(vw<560?30:40));var w=Math.min(420,aw),h=Math.min(600,ah);var r=0.70;if(h>w/r)h=Math.round(w/r);if(w>h*r)w=Math.round(h*r);return{w:Math.round(w),h:Math.round(h)};}'+
-    'var sz=fpSize();var pf=new St.PageFlip(document.getElementById("fp-book"),{width:sz.w,height:sz.h,size:"stretch",minWidth:240,maxWidth:900,minHeight:300,maxHeight:1100,maxShadowOpacity:0.5,showCover:true,mobileScrollSupport:true,usePortrait:true});pf.loadFromHTML(document.querySelectorAll(".fp-page"));'+
-    'var rt=null;window.addEventListener("resize",function(){clearTimeout(rt);rt=setTimeout(function(){try{pf.update();}catch(e){}},200);});'+
-    '<\/script>'+
+    '</head><body><div id="fp-load" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#c9a86a;font-family:Georgia,serif">Diagramando páginas…</div><div id="fp-book"></div>'+
+    '<script>window.FPL=('+__fplModule.toString()+')();<\/script>'+
+    '<script type="application/json" id="fp-pages">'+JSON.stringify(pagesHtml).replace(/</g,'\\u003c')+'<\/script>'+
+    '<script>(function(){var pgs=JSON.parse(document.getElementById("fp-pages").textContent);var est={pf:null,total:0,tamanho:null};var op={reservaAlto:40,aviso:function(on){document.getElementById("fp-load").style.display=on?"flex":"none";}};'+
+    'function ini(){FPL.montar(document.getElementById("fp-book"),pgs,op).then(function(r){est.pf=r.pf;est.total=r.total;est.tamanho=r.tamanho;FPL.acompanhar(est,"#fp-book",pgs,op);}).catch(function(e){document.getElementById("fp-load").textContent="Não foi possível abrir: "+e.message;});}'+
+    'if(document.readyState==="complete")ini();else window.addEventListener("load",ini);})();<\/script>'+
     '</body></html>';
   var blob = new Blob([doc], {type:'text/html'});
   var url = URL.createObjectURL(blob);
@@ -583,26 +588,21 @@ function openFlipbook(titulo, pagesHtml){
   layer.innerHTML = '<div class="fp-overlay" onclick="if(event.target===this) closeFlipbook()">'+
     '<div class="fp-toolbar"><button class="btn btn-ghost" onclick="downloadFlipbookHtml(__FP_STATE.titulo, __FP_STATE.pages)">'+svgIcon('download',{size:14})+' Baixar arquivo</button> '+
     '<button class="btn btn-ghost" onclick="closeFlipbook()">'+svgIcon('close',{size:14})+' Fechar</button></div>'+
-    '<div id="fp-book" class="fp-book">'+pagesHtml.join('')+'</div>'+
+    '<div class="fp-loading" id="fp-loading">Diagramando páginas…</div>'+
+    '<div id="fp-book" class="fp-book"></div>'+
   '</div>';
   layer.classList.add('open');
-  try {
-    var PF = (window.St && window.St.PageFlip) ? window.St.PageFlip : null;
-    if (!PF){ toast('Visualizador de flipbook indisponível (biblioteca não carregou).'); return; }
-    var bookEl = document.getElementById('fp-book');
-    var sz = fpComputeSize();
-    var pf = new PF(bookEl, { width: sz.w, height: sz.h, size:'stretch', minWidth:240, maxWidth:900, minHeight:300, maxHeight:1100, maxShadowOpacity:0.5, showCover:true, mobileScrollSupport:true, usePortrait:true });
-    pf.loadFromHTML(bookEl.querySelectorAll('.fp-page'));
-    window.__fp = pf;
-    var resizeTimer = null;
-    window.__fp_resize = function(){
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(function(){ try { if (window.__fp && typeof window.__fp.update==='function') window.__fp.update(); } catch(e3){} }, 200);
-    };
-    window.addEventListener('resize', window.__fp_resize);
-  } catch(e){ toast('Não foi possível abrir o flipbook.'); }
+  if (!window.FPL || !(window.St && window.St.PageFlip)){ toast('Visualizador de flipbook indisponível (biblioteca não carregou).'); return; }
+  var aviso = function(on){ var el = document.getElementById('fp-loading'); if (el) el.hidden = !on; };
+  var estado = { pf:null, total:0, tamanho:null };
+  var opts = { aviso: aviso };
+  FPL.montar(document.getElementById('fp-book'), pagesHtml, opts).then(function(r){
+    estado.pf = r.pf; estado.total = r.total; estado.tamanho = r.tamanho; window.__fp = r.pf;
+    window.__fp_stop = FPL.acompanhar(estado, '#fp-book', pagesHtml, Object.assign({}, opts, { depois: function(n){ window.__fp = n.pf; } }));
+  }).catch(function(){ aviso(false); toast('Não foi possível abrir o flipbook.'); });
 }
 function closeFlipbook(){
+  if (window.__fp_stop){ window.__fp_stop(); window.__fp_stop = null; }
   if (window.__fp){ try { window.__fp.destroy(); } catch(e){} window.__fp = null; }
   if (window.__fp_resize){ window.removeEventListener('resize', window.__fp_resize); window.__fp_resize = null; }
   var layer = document.getElementById('layer'); layer.classList.remove('open'); layer.innerHTML = '';
