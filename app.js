@@ -388,12 +388,17 @@ function slideFlipbookPages(item){
   if (item.type==='image' && item.url) return ['<div class="fp-page fp-page-full-img"><img src="'+item.url+'" alt="Slide"></div>'];
   return null;
 }
+function slideReadHtml(item){
+  if (item.type==='pdf' && item.pages && item.pages.length) return item.pages.map(function(p){ return '<img src="'+p+'" alt="Slide">'; }).join('');
+  if (item.type==='image' && item.url) return '<img src="'+h(item.url)+'" alt="Slide">';
+  return null;
+}
 function openSlideFlipbook(path, idx){
   var arr = ed(path, [])||[]; var item = arr[idx]; if (!item) return;
-  var pages = slideFlipbookPages(item);
-  if (!pages){ toast('Este item não é um arquivo de slides.'); return; }
+  var body = slideReadHtml(item);
+  if (!body){ toast('Este item não é um arquivo de slides.'); return; }
   logFlipbook(item.titulo||'Slides', 'slide', {path:path, idx:idx});
-  openFlipbook(item.titulo||'Slides', pages);
+  openReadWindow(item.titulo||'Slides', body, true);
 }
 function downloadSlideFlipbook(path, idx){
   var arr = ed(path, [])||[]; var item = arr[idx]; if (!item) return;
@@ -625,24 +630,34 @@ function closeFlipbook(){
   if (window.__fp_resize){ window.removeEventListener('resize', window.__fp_resize); window.__fp_resize = null; }
   var layer = document.getElementById('layer'); layer.classList.remove('open'); layer.innerHTML = '';
 }
+var __READ_STANDALONE = false;
+function openReadWindow(titulo, bodyHtml, standalone){
+  closeReadMode();
+  __READ_STANDALONE = !!standalone;
+  var layer = document.getElementById('layer');
+  var wrap = document.createElement('div');
+  wrap.innerHTML = '<div class="read-overlay" id="read-overlay" onclick="if(event.target===this) closeReadMode()">'+
+    '<div class="read-head"><strong>'+svgIcon('search',{size:14})+' '+h(titulo||'Leitura')+'</strong><button class="btn btn-ghost" onclick="closeReadMode()">'+svgIcon('close',{size:14})+' Fechar</button></div>'+
+    '<div class="read-panel" id="read-panel">'+bodyHtml+'</div></div>';
+  layer.appendChild(wrap.firstChild);
+  if (standalone) layer.classList.add('open');
+  Array.prototype.forEach.call(document.querySelectorAll('#read-panel img'), function(img){
+    img.addEventListener('click', function(){ openImgLightbox(img.getAttribute('src'), img.getAttribute('alt')); });
+  });
+}
 function openReadMode(){
   if (!window.__fp){ toast('Abra o flipbook primeiro.'); return; }
-  closeReadMode();
   var idx = 0; try { idx = window.__fp.getCurrentPageIndex(); } catch(e){}
   var pages = document.querySelectorAll('#fp-book .fp-page');
   if (!pages.length) return;
   var html = (pages[idx] ? pages[idx].innerHTML : '');
   if (pages[idx+1] && window.innerWidth>=560) html += pages[idx+1].innerHTML;
-  var wrap = document.createElement('div');
-  wrap.innerHTML = '<div class="read-overlay" id="read-overlay" onclick="if(event.target===this) closeReadMode()">'+
-    '<div class="read-head"><strong>'+svgIcon('search',{size:14})+' Modo leitura</strong><button class="btn btn-ghost" onclick="closeReadMode()">'+svgIcon('close',{size:14})+' Fechar</button></div>'+
-    '<div class="read-panel" id="read-panel">'+html+'</div></div>';
-  document.getElementById('layer').appendChild(wrap.firstChild);
-  Array.prototype.forEach.call(document.querySelectorAll('#read-panel img'), function(img){
-    img.addEventListener('click', function(){ openImgLightbox(img.getAttribute('src'), img.getAttribute('alt')); });
-  });
+  openReadWindow('Modo leitura', html, false);
 }
-function closeReadMode(){ var el = document.getElementById('read-overlay'); if (el) el.remove(); }
+function closeReadMode(){
+  var el = document.getElementById('read-overlay'); if (el) el.remove();
+  if (__READ_STANDALONE){ var layer = document.getElementById('layer'); layer.classList.remove('open'); layer.innerHTML=''; __READ_STANDALONE = false; }
+}
 var __IMG_ZOOM = 1;
 function openImgLightbox(src, alt){
   __IMG_ZOOM = 1;
