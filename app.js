@@ -414,8 +414,8 @@ function slidesSectionHtml(path, showAdd){
     var removeBtn = STATE.edit ? ('<button class="edit-inline-btn" onclick="event.preventDefault();removeListItem(\''+path+'\','+idx+')">'+svgIcon('close',{size:12})+'</button>') : '';
     if (isFile){
       var countLbl = it.type==='pdf' ? (' ('+(it.pages?it.pages.length:0)+' pág.)') : '';
-      return '<div class="media-row"><button class="link-like" onclick="openSlideFlipbook(\''+path+'\','+idx+')">'+svgIcon('doc',{size:16})+'<span>'+h(it.titulo||'Slides')+countLbl+'</span></button>'+
-        '<button class="edit-inline-btn" onclick="downloadSlideFlipbook(\''+path+'\','+idx+')" title="Baixar flipbook">'+svgIcon('download',{size:12})+'</button>'+removeBtn+'</div>';
+      return '<div class="media-row"><button class="link-like" onclick="openSlideFlipbook(\''+path+'\','+idx+')" title="Abrir para visualizar">'+svgIcon('doc',{size:16})+'<span>'+h(it.titulo||'Slides')+countLbl+'</span>'+svgIcon('chev',{size:13})+'</button>'+
+        (STATE.edit ? ('<button class="edit-inline-btn" onclick="downloadSlideFlipbook(\''+path+'\','+idx+')" title="Baixar flipbook">'+svgIcon('download',{size:12})+'</button>') : '')+removeBtn+'</div>';
     }
     var editBtn = STATE.edit ? ('<button class="edit-inline-btn" onclick="event.preventDefault();editListItem(\''+path+'\','+idx+')">'+svgIcon('edit',{size:12})+'</button>') : '';
     return '<a class="media-row" href="'+h(it.url)+'" target="_blank" rel="noopener">'+svgIcon('doc',{size:16})+'<span>'+h(it.titulo||it.url)+'</span>'+svgIcon('chev',{size:13})+'</a>'+editBtn+removeBtn;
