@@ -40,7 +40,10 @@ var ICONS = {
   edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z"/>',
   download:'<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
   image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>',
-  anchor:'<circle cx="12" cy="5" r="3"/><path d="M12 8v13M5 12H2a10 10 0 0 0 20 0h-3M8 15l4 4 4-4"/>'
+  anchor:'<circle cx="12" cy="5" r="3"/><path d="M12 8v13M5 12H2a10 10 0 0 0 20 0h-3M8 15l4 4 4-4"/>',
+  youtube:'<rect x="2" y="6" width="20" height="12" rx="4"/><path d="M10 9.5v5l4.5-2.5z"/>',
+  instagram:'<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".6" fill="currentColor"/>',
+  facebook:'<path d="M15 3h-2a4 4 0 0 0-4 4v3H6v4h3v7h4v-7h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>'
 };
 function svgIcon(name, attrs){
   attrs = attrs || {};
@@ -207,6 +210,9 @@ var ATTACH_ITEMS = [
   {ic:'video', label:'Vídeo principal (link)', fn:'attachVideoPrincipal'},
   {ic:'video', label:'Vídeo de utilização do equipamento', fn:'attachVideoUso'},
   {ic:'play', label:'Vídeo (lista de vídeos)', fn:'attachVideoList'},
+  {ic:'youtube', label:'Vídeo do YouTube', fn:'attachVideoYoutube'},
+  {ic:'instagram', label:'Vídeo do Instagram', fn:'attachVideoInstagram'},
+  {ic:'facebook', label:'Vídeo do Facebook', fn:'attachVideoFacebook'},
   {ic:'news', label:'Reportagem/link', fn:'attachLink'},
   {ic:'doc', label:'Slides (PDF, imagem ou link)', fn:'attachSlides'}
 ];
@@ -240,6 +246,17 @@ function attachVideoPrincipal(path){
 }
 function attachVideoUso(path){ editVideoUsoPrompt(path); }
 function attachVideoList(path){ addListItem(path+'.videos'); }
+function attachSocialVideo(path, plataforma){
+  var url = window.prompt('Cole o link do vídeo do '+plataforma+':', ''); if (!url) return;
+  var norm = normalizeUrl(url);
+  if (!looksLikeUrl(norm)){ window.alert('O link informado não parece válido. Cole a URL completa.'); return; }
+  var arr = (ed(path+'.videos', [])||[]).slice();
+  arr.push({titulo: plataforma, url: norm});
+  setEditPath(path+'.videos', arr); render();
+}
+function attachVideoYoutube(path){ attachSocialVideo(path, 'YouTube'); }
+function attachVideoInstagram(path){ attachSocialVideo(path, 'Instagram'); }
+function attachVideoFacebook(path){ attachSocialVideo(path, 'Facebook'); }
 function attachLink(path){ addListItem(path+'.links'); }
 function attachSlides(path){ addSlideItem(path+'.slides'); }
 function getPdfInput(){ return document.getElementById('pdf-upload-input'); }
