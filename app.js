@@ -560,17 +560,17 @@ function downloadFlipbookHtml(titulo, pagesHtml){
     '<meta name="viewport" content="width=device-width, initial-scale=1">'+
     '<title>'+h(titulo||'Flipbook')+' — RelyOn Academy</title>'+
     '<style>html,body{margin:0;background:#0B0F17;color:#fff;font-family:system-ui,sans-serif}'+
-    '.fp-page{position:relative;background:#f6f1e3;color:#2b2016;padding:34px 30px;box-sizing:border-box;font-family:Georgia,\'Times New Roman\',serif;font-size:14px;line-height:1.75;overflow-y:auto;overflow-x:hidden;overflow-wrap:break-word;word-break:break-word;border:1px solid #d8cdae;background-size:cover;background-position:center;box-shadow:inset 0 0 50px rgba(60,40,10,.08);display:flex;flex-direction:column}'+
+    '.fp-page{position:relative;background:#f6f1e3;color:#2b2016;padding:26px 22px;box-sizing:border-box;font-family:Georgia,\'Times New Roman\',serif;font-size:15.5px;line-height:1.7;overflow-y:auto;overflow-x:hidden;overflow-wrap:break-word;word-break:break-word;border:1px solid #d8cdae;background-size:cover;background-position:center;box-shadow:inset 0 0 50px rgba(60,40,10,.08);display:flex;flex-direction:column}'+
     '.fp-page::after{content:\'\';position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.10),transparent 6%,transparent 94%,rgba(0,0,0,.10))}'+
-    '.fp-page h1{font-size:20px;margin:6px 0 2px;font-family:Georgia,serif}.fp-page h2{font-size:12px;color:#8a7a5c;text-transform:uppercase;letter-spacing:.05em;margin-bottom:0}'+
-    '.fp-page h3{font-size:15px;color:#a3620f;margin-bottom:10px;font-family:Georgia,serif}.fp-page blockquote{font-style:italic;border-left:3px solid #a3620f;padding-left:12px;margin:0;font-size:13px;color:#4a3d28}'+
-    '.fp-page ul{padding-left:20px;margin:0}.fp-page ul li{margin-bottom:6px;font-size:13px}'+
-    '.fp-text{font-family:Georgia,\'Times New Roman\',serif;font-size:14px;line-height:1.9;text-align:justify;overflow-wrap:break-word;word-break:break-word}.fp-text img{max-width:100%;height:auto;border-radius:4px;margin:10px 0;display:block;box-shadow:0 2px 10px rgba(0,0,0,.18)}'+
+    '.fp-page h1{font-size:21px;margin:6px 0 2px;font-family:Georgia,serif}.fp-page h2{font-size:12.5px;color:#8a7a5c;text-transform:uppercase;letter-spacing:.05em;margin-bottom:0}'+
+    '.fp-page h3{font-size:16px;color:#a3620f;margin-bottom:10px;font-family:Georgia,serif}.fp-page blockquote{font-style:italic;border-left:3px solid #a3620f;padding-left:12px;margin:0;font-size:14.5px;color:#4a3d28}'+
+    '.fp-page ul{padding-left:20px;margin:0}.fp-page ul li{margin-bottom:6px;font-size:14.5px}'+
+    '.fp-text{font-family:Georgia,\'Times New Roman\',serif;font-size:15.5px;line-height:1.8;text-align:justify;overflow-wrap:break-word;word-break:break-word}.fp-text img{max-width:100%;height:auto;border-radius:4px;margin:10px 0;display:block;box-shadow:0 2px 10px rgba(0,0,0,.18)}'+
     '.fp-cover{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:linear-gradient(160deg,#2b2016,#1a140d);color:#f0e6d2}.fp-cover h1{color:#f0e6d2;max-width:100%;overflow-wrap:break-word}.fp-cover h2{color:#c9a86a;max-width:100%;overflow-wrap:break-word}'+
-    '.fp-img-wrap{margin:-34px -30px 14px;overflow:hidden;background:#2b2016}.fp-img-wrap img{width:100%;max-height:28vh;object-fit:contain;display:block;background:#2b2016}'+
+    '.fp-img-wrap{margin:-26px -22px 12px;overflow:hidden;background:#2b2016}.fp-img-wrap img{width:100%;max-height:30vh;object-fit:contain;display:block;background:#2b2016}'+
     '.fp-page-full-img{padding:0;overflow:hidden}.fp-page-full-img img{width:100%;height:100%;object-fit:contain;display:block;background:#2b2016}'+
     'body{display:flex;justify-content:center;align-items:center;padding:20px 10px;background:#0B0F17;box-sizing:border-box;min-height:100vh;overflow:hidden}#fp-book{max-width:100%;filter:drop-shadow(0 18px 40px rgba(0,0,0,.5))}'+
-    '@media(max-width:560px){body{padding:10px}.fp-page{padding:22px 16px 18px;font-size:12.5px}.fp-page h1{font-size:17px}.fp-page h3{font-size:13px}.fp-text{font-size:12.5px;line-height:1.65}.fp-img-wrap{margin:-22px -16px 10px}.fp-img-wrap img{max-height:20vh}}'+
+    '@media(max-width:560px){body{padding:10px}.fp-page{padding:16px 13px 15px;font-size:14px}.fp-page h1{font-size:18px}.fp-page h3{font-size:14px}.fp-text{font-size:14px;line-height:1.72}.fp-img-wrap{margin:-16px -13px 8px}.fp-img-wrap img{max-height:22vh}}'+
     '</style>'+
     '<script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"><\/script>'+
     '</head><body><div id="fp-load" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#c9a86a;font-family:Georgia,serif">Diagramando páginas…</div><div id="fp-book"></div>'+
@@ -603,7 +603,8 @@ function openFlipbook(titulo, pagesHtml){
   __FP_STATE.titulo = titulo||'flipbook'; __FP_STATE.pages = pagesHtml;
   var layer = document.getElementById('layer');
   layer.innerHTML = '<div class="fp-overlay" onclick="if(event.target===this) closeFlipbook()">'+
-    '<div class="fp-toolbar"><button class="btn btn-ghost" onclick="downloadFlipbookHtml(__FP_STATE.titulo, __FP_STATE.pages)">'+svgIcon('download',{size:14})+' Baixar arquivo</button> '+
+    '<div class="fp-toolbar"><button class="btn btn-ghost" onclick="openReadMode()">'+svgIcon('search',{size:14})+' Modo leitura</button> '+
+    '<button class="btn btn-ghost" onclick="downloadFlipbookHtml(__FP_STATE.titulo, __FP_STATE.pages)">'+svgIcon('download',{size:14})+' Baixar arquivo</button> '+
     '<button class="btn btn-ghost" onclick="closeFlipbook()">'+svgIcon('close',{size:14})+' Fechar</button></div>'+
     '<div class="fp-loading" id="fp-loading">Diagramando páginas…</div>'+
     '<div id="fp-book" class="fp-book"></div>'+
@@ -624,6 +625,41 @@ function closeFlipbook(){
   if (window.__fp_resize){ window.removeEventListener('resize', window.__fp_resize); window.__fp_resize = null; }
   var layer = document.getElementById('layer'); layer.classList.remove('open'); layer.innerHTML = '';
 }
+function openReadMode(){
+  if (!window.__fp){ toast('Abra o flipbook primeiro.'); return; }
+  closeReadMode();
+  var idx = 0; try { idx = window.__fp.getCurrentPageIndex(); } catch(e){}
+  var pages = document.querySelectorAll('#fp-book .fp-page');
+  if (!pages.length) return;
+  var html = (pages[idx] ? pages[idx].innerHTML : '');
+  if (pages[idx+1] && window.innerWidth>=560) html += pages[idx+1].innerHTML;
+  var wrap = document.createElement('div');
+  wrap.innerHTML = '<div class="read-overlay" id="read-overlay" onclick="if(event.target===this) closeReadMode()">'+
+    '<div class="read-head"><strong>'+svgIcon('search',{size:14})+' Modo leitura</strong><button class="btn btn-ghost" onclick="closeReadMode()">'+svgIcon('close',{size:14})+' Fechar</button></div>'+
+    '<div class="read-panel" id="read-panel">'+html+'</div></div>';
+  document.getElementById('layer').appendChild(wrap.firstChild);
+  Array.prototype.forEach.call(document.querySelectorAll('#read-panel img'), function(img){
+    img.addEventListener('click', function(){ openImgLightbox(img.getAttribute('src'), img.getAttribute('alt')); });
+  });
+}
+function closeReadMode(){ var el = document.getElementById('read-overlay'); if (el) el.remove(); }
+var __IMG_ZOOM = 1;
+function openImgLightbox(src, alt){
+  __IMG_ZOOM = 1;
+  var wrap = document.createElement('div');
+  wrap.innerHTML = '<div class="img-lightbox" id="img-lightbox" onclick="if(event.target===this) closeImgLightbox()">'+
+    '<div class="img-lightbox-tools"><button class="btn btn-ghost" onclick="imgZoom(0.8)">− '+svgIcon('search',{size:13})+'</button>'+
+    '<button class="btn btn-ghost" onclick="imgZoom(1.25)">+ '+svgIcon('search',{size:13})+'</button>'+
+    '<button class="btn btn-ghost" onclick="closeImgLightbox()">'+svgIcon('close',{size:14})+' Fechar</button></div>'+
+    '<div class="img-lightbox-scroll"><img id="lightbox-img" src="'+h(src)+'" alt="'+h(alt||'')+'" style="transform:scale(1)"></div></div>';
+  document.getElementById('layer').appendChild(wrap.firstChild);
+}
+function imgZoom(factor){
+  __IMG_ZOOM = Math.max(0.5, Math.min(6, __IMG_ZOOM*factor));
+  var img = document.getElementById('lightbox-img');
+  if (img) img.style.transform = 'scale('+__IMG_ZOOM+')';
+}
+function closeImgLightbox(){ var el = document.getElementById('img-lightbox'); if (el) el.remove(); }
 function openTextEditor(path){
   var layer = document.getElementById('layer');
   var val = ed(path, '');
