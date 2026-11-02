@@ -39,7 +39,8 @@ var ICONS = {
   case:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
   edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z"/>',
   download:'<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
-  image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>'
+  image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>',
+  anchor:'<circle cx="12" cy="5" r="3"/><path d="M12 8v13M5 12H2a10 10 0 0 0 20 0h-3M8 15l4 4 4-4"/>'
 };
 function svgIcon(name, attrs){
   attrs = attrs || {};
@@ -811,10 +812,11 @@ var COURSES = [
   {id:'huet', area:'aeronautica', sigla:'HUET', nome:'Escape de Helicóptero Submerso', desc:'HUET — técnicas de escape, orientação subaquática e uso do EAPR aeronáutico.', nivel:'Avançado', carga:'20h', modulos:3, aulas:8, instrutor:'Mario Machado', progresso:45, status:'em andamento', img:'HELI'},
   {id:'brig', area:'incendio', sigla:'BRIG', nome:'Brigada de Incêndio Industrial/Offshore', desc:'Organização de brigada, NR-23 e resposta a emergência em plataformas.', nivel:'Avançado', carga:'32h', modulos:4, aulas:12, instrutor:'Mario Machado', progresso:10, status:'em andamento', img:'PLAT_FIRE'},
   {id:'cerr', area:'sobrevivencia', sigla:'CERR', nome:'Embarcação Rápida de Resgate', desc:'Lançamento, operação e recuperação do bote de resgate rápido (FRC) e técnicas de resgate de homem ao mar, conforme STCW A-VI/2-2.', nivel:'Avançado', carga:'8h', modulos:1, aulas:4, instrutor:'Mario Machado', progresso:100, status:'concluído', img:'RAFT'},
-  {id:'cess', area:'sobrevivencia', sigla:'CESS', nome:'Embarcações de Sobrevivência e Salvamento', desc:'Lançamento e operação de balsas infláveis e baleeiras de sobrevivência, embarque e abandono de plataforma, conforme STCW A-VI/2-1.', nivel:'Intermediário', carga:'14h', modulos:2, aulas:7, instrutor:'Mario Machado', progresso:0, status:'não iniciado', img:'BLDG_FIRE'}
+  {id:'cess', area:'sobrevivencia', sigla:'CESS', nome:'Embarcações de Sobrevivência e Salvamento', desc:'Lançamento e operação de balsas infláveis e baleeiras de sobrevivência, embarque e abandono de plataforma, conforme STCW A-VI/2-1.', nivel:'Intermediário', carga:'14h', modulos:2, aulas:7, instrutor:'Mario Machado', progresso:0, status:'não iniciado', img:'BLDG_FIRE'},
+  {id:'vhf', area:'maritima', sigla:'VHF', nome:'Comunicações VHF Marítimas', desc:'Operação de rádio VHF marítimo, procedimentos GMDSS, canais de emergência e protocolos de chamada e socorro, conforme normas STCW/NORMAM.', nivel:'Básico', carga:'8h', modulos:0, aulas:0, instrutor:'Mario Machado', progresso:0, status:'não iniciado', img:'BLDG_FIRE'}
 ];
 function byId(arr, id){ for (var i=0;i<arr.length;i++){ if (arr[i].id===id) return arr[i]; } return null; }
-function areaName(a){ return {incendio:'Combate a Incêndio', sobrevivencia:'Sobrevivência Pessoal', 'primeiros-socorros':'Primeiros Socorros', aeronautica:'Operações Aeronáuticas', comunicacoes:'Comunicações de Emergência'}[a] || a; }
+function areaName(a){ return {incendio:'Combate a Incêndio', sobrevivencia:'Sobrevivência Pessoal', 'primeiros-socorros':'Primeiros Socorros', aeronautica:'Operações Aeronáuticas', comunicacoes:'Comunicações de Emergência', maritima:'Marítima'}[a] || a; }
 
 var CACI_MODULES = [
   {num:'01', titulo:'Teoria do Fogo e Classes de Incêndio', aulas:[
@@ -986,7 +988,7 @@ function pInicio(){
   }).join('');
   var areas = {};
   COURSES.forEach(function(c){ areas[c.area] = (areas[c.area]||0)+1; });
-  var areaCards = Object.keys(areas).map(function(a){ return '<div class="area-card"><div class="area-icon">'+svgIcon(a==='incendio'?'flame':a==='aeronautica'?'heli':a==='sobrevivencia'?'raft':a==='comunicacoes'?'link':'check',{size:22})+'</div>'+'<h4>'+h(areaName(a))+'</h4><span>'+areas[a]+' curso(s)</span></div>'; }).join('');
+  var areaCards = Object.keys(areas).map(function(a){ return '<div class="area-card"><div class="area-icon">'+svgIcon(a==='incendio'?'flame':a==='aeronautica'?'heli':a==='sobrevivencia'?'raft':a==='comunicacoes'?'link':a==='maritima'?'anchor':'check',{size:22})+'</div>'+'<h4>'+h(areaName(a))+'</h4><span>'+areas[a]+' curso(s)</span></div>'; }).join('');
   var catalogo = COURSES.slice(0,4).map(courseCard).join('');
   return '<section class="hero"><div class="hero-text"><span class="eyebrow">Plataforma de Instrutores</span>'+'<h1>Formação técnica em combate a incêndio, sobrevivência e emergências</h1>'+'<p>Trilhas com rastreabilidade normativa completa: cada tema aponta a norma oficial, os equipamentos envolvidos, manuais de fabricantes e casos reais.</p>'+'<div class="hero-actions"><a class="btn btn-primary" href="#/cursos">Ver cursos'+svgIcon('chev',{size:16})+'</a><a class="btn btn-ghost" href="#/biblioteca">Biblioteca Técnica</a></div></div>'+'<div class="hero-stats">'+'<div class="stat"><strong>'+COURSES.length+'</strong><span>cursos ativos</span></div>'+'<div class="stat"><strong>'+Object.keys(NORMS).length+'</strong><span>normas rastreadas</span></div>'+'<div class="stat"><strong>'+VIDEOS.length+'</strong><span>vídeos técnicos</span></div>'+'</div></section>'+'<section class="section"><h2>Continue treinando</h2><div class="rail">'+rail+'</div></section>'+'<section class="section"><h2>Áreas técnicas</h2><div class="area-grid">'+areaCards+'</div></section>'+'<section class="section"><h2>Catálogo</h2><div class="course-grid">'+catalogo+'</div><a class="btn btn-ghost" href="#/cursos">Ver todos os cursos'+svgIcon('chev',{size:16})+'</a></section>';
 }
