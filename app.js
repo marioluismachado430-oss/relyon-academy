@@ -555,7 +555,14 @@ function buildFlipbookPages(titulo, subtitulo, content, trecho, equip, manuais, 
   if (extras){
     if (extras.videos && extras.videos.length) chunkList(extras.videos, 6).forEach(function(group){ pages.push('<div class="fp-page"><h3>Vídeos</h3><ul>'+group.map(function(v){ return '<li><a href="'+h(v.url)+'" target="_blank" rel="noopener">'+h(v.titulo||v.url)+'</a></li>'; }).join('')+'</ul></div>'); });
     if (extras.links && extras.links.length) chunkList(extras.links, 6).forEach(function(group){ pages.push('<div class="fp-page"><h3>Reportagens e links</h3><ul>'+group.map(function(l){ return '<li><a href="'+h(l.url)+'" target="_blank" rel="noopener">'+h(l.titulo||l.url)+'</a></li>'; }).join('')+'</ul></div>'); });
-    if (extras.slides && extras.slides.length) chunkList(extras.slides, 6).forEach(function(group){ pages.push('<div class="fp-page"><h3>Slides</h3><ul>'+group.map(function(s){ return s.url ? ('<li><a href="'+h(s.url)+'" target="_blank" rel="noopener">'+h(s.titulo||s.url)+'</a></li>') : ('<li>'+h(s.titulo||'Slides')+(s.pages?' ('+s.pages.length+' pág.)':'')+'</li>'); }).join('')+'</ul></div>'); });
+    if (extras.slides && extras.slides.length){
+      var slidesSemPaginas = [];
+      extras.slides.forEach(function(s){
+        var sp = slideFlipbookPages(s);
+        if (sp && sp.length) pages = pages.concat(sp); else slidesSemPaginas.push(s);
+      });
+      if (slidesSemPaginas.length) chunkList(slidesSemPaginas, 6).forEach(function(group){ pages.push('<div class="fp-page"><h3>Slides</h3><ul>'+group.map(function(s){ return s.url ? ('<li><a href="'+h(s.url)+'" target="_blank" rel="noopener">'+h(s.titulo||s.url)+'</a></li>') : ('<li>'+h(s.titulo||'Slides')+'</li>'); }).join('')+'</ul></div>'); });
+    }
   }
   pages.push('<div class="fp-page fp-cover"><p class="muted">Fim</p></div>');
   return pages;
