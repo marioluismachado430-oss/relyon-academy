@@ -38,7 +38,8 @@ var ICONS = {
   news:'<path d="M4 4h12v16l-4-2-4 2-4-2z"/><path d="M8 8h4M8 11h4"/>',
   case:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
   edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z"/>',
-  download:'<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>'
+  download:'<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
+  image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>'
 };
 function svgIcon(name, attrs){
   attrs = attrs || {};
@@ -199,31 +200,47 @@ function editImagePrompt(path){
   var merged = {}; for (var k in cur){ merged[k]=cur[k]; } merged.url=url; merged.alt = (alt==null)?(cur.alt||''):alt;
   setEditPath(path, merged); render();
 }
-function addAttachment(path){
-  var choice = window.prompt('O que deseja anexar a esta aula?\n\n1 = Imagem, vídeo ou PDF principal da aula\n2 = Vídeo de utilização do equipamento\n3 = Vídeo (lista de vídeos)\n4 = Reportagem/link\n5 = Slides (PDF, imagem ou link)', '1');
-  if (!choice) return;
-  choice = choice.trim();
-  if (choice==='1'){ addLessonMedia(path); return; }
-  if (choice==='2'){ editVideoUsoPrompt(path); return; }
-  if (choice==='3'){ addListItem(path+'.videos'); return; }
-  if (choice==='4'){ addListItem(path+'.links'); return; }
-  if (choice==='5'){ addSlideItem(path+'.slides'); return; }
-  toast('Opção inválida.');
+var ATTACH_ITEMS = [
+  {ic:'image', label:'Imagem principal', fn:'attachImage'},
+  {ic:'doc', label:'PDF principal (flipbook)', fn:'attachPdf'},
+  {ic:'video', label:'Vídeo principal (link)', fn:'attachVideoPrincipal'},
+  {ic:'video', label:'Vídeo de utilização do equipamento', fn:'attachVideoUso'},
+  {ic:'play', label:'Vídeo (lista de vídeos)', fn:'attachVideoList'},
+  {ic:'news', label:'Reportagem/link', fn:'attachLink'},
+  {ic:'doc', label:'Slides (PDF, imagem ou link)', fn:'attachSlides'}
+];
+function openAttachMenu(path){
+  var layer = document.getElementById('layer');
+  var btns = ATTACH_ITEMS.map(function(it){
+    return '<button class="attach-opt" onclick="closeAttachMenu();'+it.fn+'(\''+h(path)+'\')">'+svgIcon(it.ic,{size:20})+'<span>'+it.label+'</span></button>';
+  }).join('');
+  layer.innerHTML = '<div class="attach-overlay" onclick="if(event.target===this) closeAttachMenu()">'+
+    '<div class="attach-modal" onclick="event.stopPropagation()">'+
+      '<div class="attach-head"><strong>Anexar à aula</strong><button class="icon-btn" onclick="closeAttachMenu()">'+svgIcon('close',{size:16})+'</button></div>'+
+      '<div class="attach-grid">'+btns+'</div>'+
+    '</div></div>';
+  layer.classList.add('open');
 }
-function addLessonMedia(path){
-  var t = window.prompt('Tipo de mídia — digite "imagem", "video", "embed" ou "pdf" (o PDF vira um flipbook automaticamente):', 'imagem');
-  if (!t) return;
-  t = t.toLowerCase().trim(); if (['imagem','video','embed','pdf'].indexOf(t)<0) t='imagem';
-  if (t==='pdf'){ handlePdfUpload(path+'.media'); return; }
-  if (t==='imagem'){ var fromDevice = window.confirm('Enviar foto do seu computador ou celular?\n\nOK = escolher arquivo\nCancelar = colar um link (URL)'); if (fromDevice){ handleImageUpload(path+'.media', {type:'image', alt:''}); return; } }
-  var url = window.prompt('URL da mídia:', '');
-  if (url===null || url==='') return;
-  var alt = t==='imagem' ? (window.prompt('Descrição da imagem (alt):','')||'') : (window.prompt('Rótulo exibido no link:','Assistir vídeo')||'Assistir vídeo');
-  var typeMap = {imagem:'image', video:'video', embed:'embed'};
-  var finalUrl = (t==='imagem') ? url : normalizeUrl(url);
-  if (t!=='imagem' && !looksLikeUrl(finalUrl)){ window.alert('O link informado não parece válido. Cole a URL completa (ex: https://youtube.com/watch?v=XXXX).'); return; }
-  setEditPath(path+'.media', {type:typeMap[t], url:finalUrl, alt:alt}); render();
+function closeAttachMenu(){ var layer = document.getElementById('layer'); layer.classList.remove('open'); layer.innerHTML=''; }
+function attachImage(path){
+  var fromDevice = window.confirm('Enviar foto do seu computador ou celular?\n\nOK = escolher arquivo\nCancelar = colar um link (URL)');
+  if (fromDevice){ handleImageUpload(path+'.media', {type:'image', alt:''}); return; }
+  var url = window.prompt('URL da imagem:', ''); if (!url) return;
+  var alt = window.prompt('Descrição da imagem (alt):', '')||'';
+  setEditPath(path+'.media', {type:'image', url:url, alt:alt}); render();
 }
+function attachPdf(path){ handlePdfUpload(path+'.media'); }
+function attachVideoPrincipal(path){
+  var url = window.prompt('URL do vídeo:', ''); if (!url) return;
+  var norm = normalizeUrl(url);
+  if (!looksLikeUrl(norm)){ window.alert('O link informado não parece válido. Cole a URL completa (ex: https://youtube.com/watch?v=XXXX).'); return; }
+  var alt = window.prompt('Rótulo exibido no link:', 'Assistir vídeo')||'Assistir vídeo';
+  setEditPath(path+'.media', {type:'video', url:norm, alt:alt}); render();
+}
+function attachVideoUso(path){ editVideoUsoPrompt(path); }
+function attachVideoList(path){ addListItem(path+'.videos'); }
+function attachLink(path){ addListItem(path+'.links'); }
+function attachSlides(path){ addSlideItem(path+'.slides'); }
 function getPdfInput(){ return document.getElementById('pdf-upload-input'); }
 function handlePdfUpload(path){
   var input = getPdfInput();
@@ -986,7 +1003,7 @@ function lessonMediaHtml(path, a){
   if (videosArr.length){ rows += '<div class="lesson-list-group"><div class="lesson-list-h">'+svgIcon('video',{size:14})+'Vídeos</div>'+listSectionHtml(path+'.videos','video','Adicionar vídeo', false)+'</div>'; }
   if (linksArr.length){ rows += '<div class="lesson-list-group"><div class="lesson-list-h">'+svgIcon('news',{size:14})+'Reportagens e links</div>'+listSectionHtml(path+'.links','news','Adicionar reportagem/link', false)+'</div>'; }
   if (slidesArr.length){ rows += '<div class="lesson-list-group"><div class="lesson-list-h">'+svgIcon('doc',{size:14})+'Slides</div>'+slidesSectionHtml(path+'.slides', false)+'</div>'; }
-  if (STATE.edit) rows += '<button class="add-media-btn btn-block" onclick="addAttachment(\''+path+'\')">'+svgIcon('edit',{size:14})+' Anexar imagem, PDF, vídeo, link ou slides</button>';
+  if (STATE.edit) rows += '<button class="add-media-btn btn-block" onclick="openAttachMenu(\''+path+'\')">'+svgIcon('edit',{size:14})+' Anexar imagem, PDF, vídeo, link ou slides</button>';
   return rows;
 }
 function lessonPanel(courseId, mi, ai){
