@@ -1185,7 +1185,31 @@ function videoCard(v, idx){
   var editBtn = STATE.edit ? '<button class="edit-inline-btn video-edit-btn" onclick="event.preventDefault();event.stopPropagation();editVideoCardPrompt('+idx+')">'+svgIcon('edit',{size:13})+'</button>' : '';
   return '<a class="video-card" href="'+h(eff.url)+'" target="_blank" rel="noopener">'+editBtn+'<div class="video-thumb">'+svgIcon('play',{size:28})+'</div>'+'<div class="video-body"><span class="chip">'+h(areaName(eff.area))+'</span><h4>'+h(eff.titulo)+'</h4></div></a>';
 }
-function pVideos(){ return '<section class="section"><h2>Vídeos Técnicos</h2><p class="muted">Links organizados por área, direto das fontes oficiais.</p><div class="video-grid">'+VIDEOS.map(function(v,idx){ return videoCard(v, idx); }).join('')+'</div></section>'; }
+function effVideosExtra(){ return ed('videosExtra', [])||[]; }
+function addVideoLib(){
+  var titulo = window.prompt('Título do vídeo:',''); if (!titulo) return;
+  var url = window.prompt('URL do vídeo (YouTube, Instagram, Facebook, etc.):',''); if (!url) return;
+  var norm = normalizeUrl(url);
+  if (!looksLikeUrl(norm)){ window.alert('O link informado não parece válido. Cole a URL completa.'); return; }
+  var area = window.prompt('Área técnica (ex: incendio, sobrevivencia, primeiros-socorros, aeronautica, comunicacoes, maritima) — opcional:','')||'';
+  var arr = effVideosExtra().slice();
+  arr.push({titulo:titulo, url:norm, area:area});
+  setEditPath('videosExtra', arr); render();
+}
+function removeVideoLib(idx){
+  if (!window.confirm('Remover este vídeo?')) return;
+  var arr = effVideosExtra().slice(); arr.splice(idx,1);
+  setEditPath('videosExtra', arr); render();
+}
+function videoCardExtra(v, idx){
+  var editBtn = STATE.edit ? '<button class="edit-inline-btn video-edit-btn" onclick="event.preventDefault();event.stopPropagation();removeVideoLib('+idx+')">'+svgIcon('close',{size:13})+'</button>' : '';
+  return '<a class="video-card" href="'+h(v.url)+'" target="_blank" rel="noopener">'+editBtn+'<div class="video-thumb">'+svgIcon('play',{size:28})+'</div>'+'<div class="video-body"><span class="chip">'+h(areaName(v.area))+'</span><h4>'+h(v.titulo)+'</h4></div></a>';
+}
+function pVideos(){
+  var extra = effVideosExtra();
+  var addBtn = STATE.edit ? '<button class="add-media-btn btn-block" onclick="addVideoLib()">'+svgIcon('edit',{size:14})+' Adicionar link de vídeo</button>' : '';
+  return '<section class="section"><h2>Vídeos Técnicos</h2><p class="muted">Links organizados por área, direto das fontes oficiais.</p>'+addBtn+'<div class="video-grid">'+VIDEOS.map(function(v,idx){ return videoCard(v, idx); }).join('')+extra.map(function(v,idx){ return videoCardExtra(v, idx); }).join('')+'</div></section>';
+}
 
 function pAdmin(){
   var jsonStr = JSON.stringify(EDITS, null, 2);
